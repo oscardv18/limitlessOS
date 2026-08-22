@@ -1,0 +1,469 @@
+<title>Limitless OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;300;400;500;700&family=Noto+Serif+JP:wght@200;400&display=swap">
+
+<style>
+/* Sistema de diseño propio del proyecto (themes/hud-void/theme.toml).
+   Tema único deliberado: este documento pertenece al sistema que describe. */
+:root{
+  --void:#04060d; --void-2:#070c17;
+  --surface:rgba(12,18,32,.62); --surface-hi:rgba(16,24,42,.8);
+  --line:rgba(126,168,214,.16); --line-hi:rgba(126,168,214,.32);
+  --lapse:#3b9eff; --lapse-core:#8fe3ff;
+  --hollow:#a970ff; --hollow-core:#e9d5ff;
+  --reversal:#ff4a2e; --coral:#ff6b7f;
+  --amber:#ffd25e; --green:#4bf0a5; --cyan:#2ee6d6;
+  --text:#eaf2ff; --dim:#7e93b0; --mute:#46587a;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --jp:'Noto Serif JP',serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--void); color:var(--text);
+  font-family:var(--mono); font-weight:300; font-size:14px; line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px 100px;}
+
+/* ── cabecera ─────────────────────────────────────────────── */
+header{
+  position:relative;padding:74px 24px 52px;text-align:center;overflow:hidden;
+  border-bottom:1px solid var(--line);margin-bottom:52px;
+}
+header::before{
+  content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(52% 78% at 22% 50%, rgba(59,158,255,.16), transparent 62%),
+    radial-gradient(52% 78% at 78% 50%, rgba(255,74,46,.13), transparent 62%),
+    radial-gradient(30% 52% at 50% 50%, rgba(169,112,255,.20), transparent 68%);
+}
+header > *{position:relative;z-index:1;}
+.kanji{font-family:var(--jp);font-weight:200;font-size:44px;letter-spacing:.34em;
+  color:var(--hollow-core);text-shadow:0 0 60px var(--hollow);margin-bottom:20px;
+  padding-left:.34em;}
+h1{font-size:15px;font-weight:700;letter-spacing:.52em;color:var(--text);
+  text-wrap:balance;padding-left:.52em;}
+.sub{font-size:11px;letter-spacing:.24em;color:var(--dim);margin-top:14px;}
+.meta{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:26px;}
+
+/* ── chips ────────────────────────────────────────────────── */
+.chip{
+  font-size:9.5px;letter-spacing:.14em;padding:4px 11px;border-radius:6px;
+  border:1px solid var(--line);color:var(--dim);white-space:nowrap;
+}
+.chip.ok{color:var(--green);border-color:rgba(75,240,165,.34);background:rgba(75,240,165,.07);}
+.chip.now{color:var(--lapse);border-color:rgba(59,158,255,.4);background:rgba(59,158,255,.09);}
+.chip.wait{color:var(--mute);}
+.chip.warn{color:var(--reversal);border-color:rgba(255,74,46,.34);background:rgba(255,74,46,.07);}
+
+/* ── secciones ────────────────────────────────────────────── */
+section{margin-bottom:64px;}
+h2{
+  font-size:11px;letter-spacing:.3em;color:var(--dim);font-weight:400;
+  padding-bottom:11px;border-bottom:1px solid var(--line);margin-bottom:26px;
+  display:flex;align-items:baseline;gap:12px;
+}
+h2 .n{color:var(--hollow);font-family:var(--jp);font-size:15px;}
+h3{font-size:13px;font-weight:500;color:var(--text);margin:26px 0 10px;letter-spacing:.02em;}
+p{color:var(--dim);margin-bottom:14px;max-width:74ch;}
+p strong,li strong{color:var(--text);font-weight:500;}
+a{color:var(--lapse);}
+code{
+  font-family:var(--mono);font-size:.88em;color:var(--lapse-core);
+  background:rgba(126,168,214,.09);padding:1px 5px;border-radius:4px;
+}
+ul{list-style:none;margin-bottom:14px;}
+li{color:var(--dim);padding-left:20px;position:relative;margin-bottom:7px;max-width:74ch;}
+li::before{content:'▸';position:absolute;left:2px;color:var(--mute);}
+
+/* ── tablas ───────────────────────────────────────────────── */
+.tw{overflow-x:auto;margin-bottom:18px;border:1px solid var(--line);border-radius:12px;}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:520px;}
+th{
+  text-align:left;font-size:9px;letter-spacing:.18em;color:var(--mute);
+  font-weight:400;padding:11px 14px;border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.018);white-space:nowrap;
+}
+td{padding:10px 14px;border-bottom:1px solid rgba(126,168,214,.07);color:var(--dim);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+td strong{color:var(--text);font-weight:500;}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--amber);}
+
+/* ── fases ────────────────────────────────────────────────── */
+.phase{
+  display:grid;grid-template-columns:60px 1fr;gap:20px;
+  padding:20px 22px;margin-bottom:12px;border-radius:14px;
+  border:1px solid var(--line);background:var(--surface);
+  position:relative;overflow:hidden;
+}
+.phase::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--mute);
+}
+.phase.p-now::before{background:linear-gradient(180deg,var(--lapse),var(--hollow));
+  box-shadow:0 0 20px var(--lapse);}
+.phase.p-key::before{background:var(--amber);}
+.phase .id{
+  font-family:var(--jp);font-size:30px;font-weight:200;color:var(--mute);
+  line-height:1;padding-top:2px;
+}
+.phase.p-now .id{color:var(--lapse);text-shadow:0 0 26px rgba(59,158,255,.6);}
+.phase.p-key .id{color:var(--amber);}
+.phase h4{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px;letter-spacing:.06em;}
+.phase .tag{font-size:9px;letter-spacing:.18em;color:var(--mute);margin-bottom:11px;}
+.phase .body{font-size:12px;color:var(--dim);margin-bottom:12px;}
+.phase .done{
+  font-size:11px;color:var(--dim);padding:9px 12px;border-radius:8px;
+  background:rgba(0,0,0,.3);border-left:2px solid var(--line-hi);
+}
+.phase .done b{color:var(--green);font-weight:400;}
+
+/* ── rejillas ─────────────────────────────────────────────── */
+.grid{display:grid;gap:12px;margin-bottom:18px;}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+.g3{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.card{
+  border:1px solid var(--line);border-radius:12px;padding:16px 18px;
+  background:var(--surface);
+}
+.card h5{font-size:9.5px;letter-spacing:.2em;color:var(--mute);font-weight:400;margin-bottom:11px;}
+.card .big{font-size:13px;color:var(--text);font-weight:500;margin-bottom:7px;}
+.card p{font-size:11.5px;margin-bottom:0;}
+.card.acc-b{border-color:rgba(59,158,255,.3);} .card.acc-b h5{color:var(--lapse);}
+.card.acc-v{border-color:rgba(169,112,255,.3);} .card.acc-v h5{color:var(--hollow);}
+.card.acc-r{border-color:rgba(255,74,46,.3);}   .card.acc-r h5{color:var(--reversal);}
+
+/* ── nota ─────────────────────────────────────────────────── */
+.note{
+  border-left:2px solid var(--hollow);background:rgba(169,112,255,.07);
+  padding:14px 18px;border-radius:0 10px 10px 0;margin-bottom:18px;
+}
+.note.r{border-color:var(--reversal);background:rgba(255,74,46,.07);}
+.note.b{border-color:var(--lapse);background:rgba(59,158,255,.07);}
+.note p{margin-bottom:0;font-size:12px;}
+.note .lbl{font-size:9px;letter-spacing:.2em;color:var(--hollow);display:block;margin-bottom:6px;}
+.note.r .lbl{color:var(--reversal);} .note.b .lbl{color:var(--lapse);}
+
+/* ── pasos ────────────────────────────────────────────────── */
+.step{display:grid;grid-template-columns:30px 1fr;gap:16px;margin-bottom:18px;align-items:start;}
+.step .k{
+  width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--lapse);color:var(--lapse);font-size:11px;
+  background:rgba(59,158,255,.09);
+}
+.step .t{font-size:13px;color:var(--text);font-weight:500;margin-bottom:3px;}
+.step .d{font-size:11.5px;color:var(--dim);}
+pre{
+  background:rgba(0,0,0,.42);border:1px solid var(--line);border-radius:10px;
+  padding:13px 15px;overflow-x:auto;font-size:11.5px;line-height:1.75;
+  color:var(--dim);margin-bottom:14px;
+}
+pre .c{color:var(--mute);} pre .k{color:var(--hollow);} pre .s{color:var(--green);}
+
+footer{
+  border-top:1px solid var(--line);margin-top:70px;padding-top:26px;
+  font-size:10px;letter-spacing:.16em;color:var(--mute);text-align:center;
+}
+@media (max-width:640px){
+  .phase{grid-template-columns:1fr;gap:10px;}
+  .kanji{font-size:32px;} h1{font-size:12px;letter-spacing:.34em;}
+}
+</style>
+
+<header>
+  <div class="kanji">無下限</div>
+  <h1>LIMITLESS OS</h1>
+  <div class="sub">Plan de construcción · CachyOS + Hyprland</div>
+  <div class="meta">
+    <span class="chip ok">Instalador TUI construido</span>
+    <span class="chip ok">Tema de GRUB</span>
+    <span class="chip ok">Atajos SUPER definidos</span>
+    <span class="chip now">Fase 0 en curso</span>
+    <span class="chip wait">7 fases</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <h2><span class="n">零</span>DÓNDE ESTAMOS</h2>
+  <p>El diseño está cerrado y verificado en un mockup interactivo completo. El instalador ya no es un plan: es código real, probado, con 10 etapas que corren de principio a fin. Lo que queda por construir es la pieza más grande — el shell — y la generación automática de tema.</p>
+
+  <div class="grid g3">
+    <div class="card acc-b">
+      <h5>YA ES CÓDIGO REAL</h5>
+      <div class="big">32 archivos</div>
+      <p>Instalador TUI (10 etapas + router <code>dotctl</code> + <code>doctor</code>), zsh completo (7 módulos), Neovim, Starship, greetd, tema de GRUB, paleta del VT.</p>
+    </div>
+    <div class="card acc-v">
+      <h5>YA DISEÑADO</h5>
+      <div class="big">15 superficies</div>
+      <p>Barra, cromo, dock, launcher, menú, paquetes, proyectos, notificaciones, OSD, portapapeles, widgets, control, bloqueo, salvapantallas, greeter — todas verificadas en el mockup.</p>
+    </div>
+    <div class="card acc-r">
+      <h5>SIN EMPEZAR</h5>
+      <div class="big">La pieza grande</div>
+      <p><code>hyprland.lua</code>, el shell de QuickShell entero, <code>theme.toml</code> + matugen, 12 plantillas de tema restantes.</p>
+    </div>
+  </div>
+
+  <div class="note b">
+    <span class="lbl">LO QUE SE CONSTRUYÓ EN ESTA REVISIÓN</span>
+    <p><strong>Instalador TUI</strong> sobre <code>gum</code> (paquete oficial, no AUR) — verificado que acepta hex real antes de construir nada sobre él. <strong>zsh completo</strong> con los tres plugins que sustituyen a fish. <strong>Tema de GRUB</strong> — DSL propio verificado contra el manual y dos temas reales, fondo plano sin imágenes que mantener. <strong>Único pendiente:</strong> qué agentes usas en herdr — no bloquea nada hasta la Fase 5.</p>
+  </div>
+
+  <h3>El instalador, probado de verdad</h3>
+  <p>No es solo que compile: se ejecutó de principio a fin con las 10 etapas simuladas, dos veces (la segunda entera en <em>skip</em>, confirmando el estado persistente), con <code>--from=50</code> reanudando exactamente desde ahí, y con un fallo real que se reporta, pregunta si continuar, y dos etapas después la Fase 3 sigue corriendo como si nada — el comportamiento exacto que se prometió para los paquetes AUR.</p>
+  <p>Al revisar el propio código antes de darlo por bueno aparecieron <strong>tres fallos reales</strong>: una sustitución de comandos rota dentro de un condicional en <code>ui_banner</code>, una invocación fragilísima de <code>bash -c</code> anidado en <code>ui_spin</code> —sustituida por una función exportada, más simple y correcta—, y un simulador de <code>sudo</code> en las propias pruebas que descartaba mal un argumento. Los tres, corregidos antes de continuar.</p>
+
+  <h3>Por qué recomendaba fish, y por qué zsh gana igualmente</h3>
+  <p>Fish trae de fábrica lo que en zsh hay que montar: sugerencias del historial mientras escribes, resaltado de sintaxis en vivo, completado sin configurar nada. <strong>Pero fish no es compatible con POSIX</strong>, y ese es el argumento que decide: cada <code>source install.sh</code>, cada instalador de versiones (nvm, rustup, pyenv), cada fragmento de documentación asume bash o zsh. Para quien vive en la terminal y copia fragmentos a diario, la elección correcta es zsh.</p>
+
+  <div class="tw"><table>
+    <tr><th>Lo que fish daba gratis</th><th>Cómo se resuelve en zsh — ya escrito</th></tr>
+    <tr><td>Sugerencias del historial</td><td><code>zsh-autosuggestions</code> · <code>20-plugins.zsh</code></td></tr>
+    <tr><td>Resaltado de sintaxis en vivo</td><td><code>fast-syntax-highlighting</code> (AUR) · <code>20-plugins.zsh</code></td></tr>
+    <tr><td>Completado rico</td><td><code>zsh-completions</code> + <code>fzf-tab</code> · <code>10-completion.zsh</code></td></tr>
+  </table></div>
+
+  <p><strong>Sin oh-my-zsh</strong>: siete módulos en <code>conf.d/</code>, paquetes de pacman, y control exacto de lo que corre. El cargador de plugins prueba varias rutas por paquete y avisa —una vez, no en cada terminal— si algo falta, en vez de fallar en silencio.</p>
+</section>
+
+<section>
+  <h2><span class="n">一</span>DECISIONES CERRADAS</h2>
+  <p>El recorrido hasta aquí cambió varias premisas del plan original. Esto es lo que quedó fijado y por qué.</p>
+
+  <div class="tw"><table>
+    <tr><th>Decisión</th><th>Elegido</th><th>Motivo</th></tr>
+    <tr><td><strong>Estética</strong></td><td>HUD / Gojo</td><td>El mockup nunca fue macOS: fondo void, monoespaciada en todo, telemetría, ruedas orbitales. Más original que la réplica</td></tr>
+    <tr><td><strong>Motor del shell</strong></td><td>QuickShell</td><td>Uno solo. AGS fuera; Waybar como andamio con retirada programada en la Fase 4</td></tr>
+    <tr><td><strong>Configuración</strong></td><td>Lua, no hyprlang</td><td>Hyprland 0.55 la deprecó. 0.56 casi dobla la API. Escribir en <code>.conf</code> hoy es trabajo a tirar</td></tr>
+    <tr><td><strong>Red de seguridad</strong></td><td>snapper + grub-btrfs</td><td>Sin DE de respaldo, el salvavidas son instantáneas arrancables desde GRUB</td></tr>
+    <tr><td><strong>Login</strong></td><td>greetd + tuigreet</td><td>Sin autologin. Fidelidad de color vía remapeo de la paleta del VT</td></tr>
+    <tr><td><strong>Shell</strong></td><td>zsh + 3 plugins</td><td>fish no es POSIX: rompe cada script que copias. Sin framework, tres <code>source</code> y ya</td></tr>
+    <tr><td><strong>Terminal</strong></td><td>Ghostty</td><td>En Hyprland tilea el compositor, no el terminal. Dos sistemas de ventanas compiten</td></tr>
+    <tr><td><strong>Layouts</strong></td><td>Uno por workspace</td><td>No cambias de layout: cambias de propósito. <code>code</code>→master, <code>term</code>→scroll, <code>web</code>→dwindle</td></tr>
+    <tr><td><strong>Cristal</strong></td><td>Material, no estética</td><td>Cristal donde adorna, opacidad donde se lee. Navegador y editores opacos a propósito</td></tr>
+    <tr><td><strong>Color</strong></td><td>Paleta de identidad fija</td><td>matugen genera temas de apps ajenas <em>desde</em> la paleta, no al revés</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="n">二</span>LA RED DE SEGURIDAD</h2>
+  <p>Sin entorno gráfico de respaldo, el riesgo cambia de «queda feo» a «no puedo usar el ordenador». Tres capas, y <strong>se montan antes que ninguna otra cosa</strong>.</p>
+
+  <div class="grid g3">
+    <div class="card acc-b">
+      <h5>CAPA 1</h5>
+      <div class="big">El TTY</div>
+      <p><code>Ctrl+Alt+F2</code> siempre responde. Por eso media docena de herramientas del ecosistema son TUI: sin GUI, <code>impala</code> es la única forma de arreglar la red.</p>
+    </div>
+    <div class="card acc-v">
+      <h5>CAPA 2</h5>
+      <div class="big">Instantáneas</div>
+      <p><code>snapper</code> + <code>snap-pac</code> + <code>grub-btrfs</code>. Instantánea pre y post en cada transacción de pacman, arrancable desde el submenú de GRUB.</p>
+    </div>
+    <div class="card acc-r">
+      <h5>CAPA 3</h5>
+      <div class="big">Config mínima</div>
+      <p><code>dev/minimal.conf</code>: hyprlang, no Lua (nota de honestidad más abajo), 30 líneas, sin plugins ni shell. Si arranca, el fallo es tuyo. Si no, es del sistema. Diagnóstico en 30 segundos.</p>
+    </div>
+  </div>
+
+  <pre><span class="c"># montar la capa 2 — el primer comando del proyecto</span>
+paru -S --needed snapper snap-pac grub-btrfs
+sudo systemctl enable --now grub-btrfsd</pre>
+
+  <div class="note b">
+    <span class="lbl">POR QUÉ VA PRIMERO</span>
+    <p>Es la única parte del plan que te protege <strong>mientras construyes el resto</strong>. Montarla después es montarla cuando ya la necesitabas.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">三</span>LAS SIETE FASES</h2>
+
+  <div class="phase p-now">
+    <div class="id">0</div>
+    <div>
+      <h4>Terreno</h4>
+      <div class="tag">EL CÓDIGO YA EXISTE · FALTA EJECUTARLO</div>
+      <div class="body"><code>install.sh</code> ya no es un plan: 10 etapas reales, <code>dotctl</code> + <code>doctor</code>, zsh completo, greetd, tema de GRUB, paleta del VT — todo probado en simulación. Lo que falta de esta fase es correrlo sobre la máquina de verdad.</div>
+      <div class="done">Terminas cuando ejecutas <code>./install.sh</code>, ves el submenú de instantáneas <b>y</b> el tema en GRUB al reiniciar, y arrancas <code>Hyprland -c dev/minimal.conf</code> desde el TTY.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">1</div>
+    <div>
+      <h4>Núcleo</h4>
+      <div class="tag">3–5 DÍAS</div>
+      <div class="body"><code>hyprland.lua</code> modular, cristal afinado, workspaces semánticos, scratchpads. Y <strong>el theming operativo desde ya</strong>: <code>theme.toml</code> + plantillas de matugen, aunque solo haya un tema.</div>
+      <div class="done">Terminas cuando tienes <b>sesión completa por teclado</b> con un solo tema gobernando todo lo que existe.</div>
+    </div>
+  </div>
+
+  <div class="phase p-key">
+    <div class="id">2</div>
+    <div>
+      <h4>Habitable</h4>
+      <div class="tag">HITO CRÍTICO · 1 SEMANA</div>
+      <div class="body">Ghostty, zsh + 3 plugins, Starship, Neovim, yazi, btop, lazygit, lazydocker, herdr, impala, bluetui, portapapeles, capturas. Waybar mínima como andamio.</div>
+      <div class="done">Terminas cuando <b>trabajas el día entero aquí</b>. Sin DE de respaldo, mientras no llegues a este punto tu ordenador no es tu ordenador.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">3</div>
+    <div>
+      <h4>Sesión</h4>
+      <div class="tag">2–3 DÍAS</div>
+      <div class="body">greetd + tuigreet + paleta del VT, hyprlock, hypridle, uwsm, notificaciones, OSD. Plugins: hyprbars y hyprexpo.</div>
+      <div class="done">Terminas cuando <b>entras desde el greeter</b>, bloqueas, reanudas y el sistema te avisa.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">4</div>
+    <div>
+      <h4>Shell</h4>
+      <div class="tag">LA PIEZA GRANDE · 2–3 SEMANAS</div>
+      <div class="body">QuickShell en este orden exacto: cromo HUD → campo de colisión → barra → dock → launcher → notificaciones → OSD. Se retira Waybar, mako y swayosd a medida que se sustituyen.</div>
+      <div class="done">Terminas cuando hay <b>un solo motor de shell</b> y Waybar está desinstalada. Empieza por el cromo: es decorativo y sin estado, así que aprendes QML con red debajo.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">5</div>
+    <div>
+      <h4>Ecosistema</h4>
+      <div class="tag">1–2 SEMANAS</div>
+      <div class="body"><strong>Puente herdr → HUD</strong>, sesiones de proyecto, paneles de control y paquetes, <code>dotctl</code> completo, migraciones, <code>tui-install</code>.</div>
+      <div class="done">Terminas cuando el sistema <b>se comporta como un producto</b>, no como una colección de configuraciones.</div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="id">6</div>
+    <div>
+      <h4>Pulido</h4>
+      <div class="tag">ABIERTO</div>
+      <div class="body">Gestos, degradación por batería, spike del shader de refracción, CI de lint (<code>qmllint</code>, <code>shellcheck</code>), README con capturas.</div>
+      <div class="done">Terminas cuando el repositorio es <b>publicable</b>.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">四</span>LA INTEGRACIÓN QUE NADIE TIENE</h2>
+  <p>Instalar cuarenta paquetes no es un sistema operativo. Esto sí:</p>
+
+  <h3>herdr → HUD</h3>
+  <p>herdr detecta cuatro estados por agente. Tu paleta tiene exactamente cuatro registros. Un puente lee el estado y lo publica por IPC a QuickShell: la barra muestra un punto por agente.</p>
+
+  <div class="tw"><table>
+    <tr><th>Estado</th><th>Color</th><th>Lectura</th></tr>
+    <tr><td><strong>Bloqueado</strong></td><td style="color:var(--reversal)">#ff4a2e 赫</td><td>Reversión — algo te está esperando</td></tr>
+    <tr><td><strong>Trabajando</strong></td><td style="color:var(--amber)">#ffd25e</td><td>En curso, no molestar</td></tr>
+    <tr><td><strong>Hecho</strong></td><td style="color:var(--lapse)">#3b9eff 蒼</td><td>Atracción — listo para revisar</td></tr>
+    <tr><td><strong>Inactivo</strong></td><td style="color:var(--mute)">#6b7f9e</td><td>Ruido de fondo</td></tr>
+  </table></div>
+
+  <p><strong>Un agente que se bloquea enciende un punto rojo en la barra aunque su terminal esté en otro workspace</strong>, y dispara una notificación. Dejas de vigilar si terminó: el escritorio te lo dice. Esto no existe en ningún rice ni en Omarchy.</p>
+
+  <h3>Las TUI como ciudadanas de primera</h3>
+  <p>lazygit, btop, lazydocker y yazi no son «cosas que abres en un terminal». Cada una recibe entrada <code>.desktop</code> generada, glifo en el dock, scratchpad propio y geometría de ventana a medida. <code>SUPER+G</code> abre lazygit sobre el proyecto actual.</p>
+</section>
+
+<section>
+  <h2><span class="n">五</span>QUÉ HAY QUE CREAR</h2>
+
+  <h3>Ya construido — código real, probado</h3>
+  <div class="tw"><table>
+    <tr><th>Pieza</th><th>Dónde</th><th>Verificación</th></tr>
+    <tr><td><strong>Instalador TUI, 10 etapas</strong></td><td><code>install.sh</code> + <code>install/</code></td><td>Corrida completa simulada, reanudación con <code>--from=NN</code>, fallo con continuación — las tres, probadas</td></tr>
+    <tr><td><strong><code>dotctl</code> + <code>doctor</code></strong></td><td><code>bin/dotctl</code>, <code>bin/cmd/doctor</code></td><td>Router probado con comandos de 1 y 2 palabras + argumentos extra</td></tr>
+    <tr><td><strong>zsh completo, 7 módulos</strong></td><td><code>stow/zsh/</code></td><td>Sintaxis balanceada; los tres plugins de fish, cubiertos</td></tr>
+    <tr><td><strong><code>dev/minimal.conf</code></strong></td><td><code>dev/</code></td><td>hyprlang, no Lua — ver la nota de honestidad abajo</td></tr>
+    <tr><td><strong>Tema de GRUB</strong></td><td><code>system/grub/theme/</code></td><td>DSL verificado contra el manual + 2 temas reales de referencia</td></tr>
+    <tr><td><strong>greetd + paleta del VT</strong></td><td><code>system/greetd/</code>, <code>system/vconsole/</code></td><td>8 colores ANSI verificados uno a uno en el mockup</td></tr>
+    <tr><td><strong>Tabla definitiva de atajos</strong></td><td><code>spec-keybinds.md</code></td><td>2 colisiones reales entre documentos + 3 errores del mockup detectados y corregidos — ver abajo</td></tr>
+  </table></div>
+
+  <div class="note">
+    <span class="lbl">SUPER ES LA TECLA LÍDER — VERIFICADO AL CONSOLIDAR</span>
+    <p>El mockup usa teclas sueltas porque un navegador no puede interceptar <code>SUPER</code>. Al juntar por primera vez todos los atajos dispersos en cinco documentos aparecieron <strong>dos colisiones reales</strong>: <code>SUPER+M</code> estaba a la vez asignado a música (scratchpad) y al menú de comandos — se resolvió dejando el menú en <code>M</code> y moviendo música a <code>SUPER+SHIFT+M</code>. Y <strong>tres atajos del mockup habrían sido errores graves</strong> copiados tal cual: workspaces con <code>1</code>–<code>5</code> sueltos (rompería escribir cualquier dígito), volumen con flechas sueltas (rompería navegación básica), foco de ventana con <code>Tab</code> suelto (rompería moverse entre campos de formulario). Los tres corregidos a <code>SUPER+1..9</code>, teclas multimedia y <code>SUPER+TAB</code> respectivamente. El mockup ya muestra la combinación real junto a cada tecla de prueba.</p>
+  </div>
+
+  <div class="note r">
+    <span class="lbl">UNA HONESTIDAD: <code>dev/minimal.conf</code>, no <code>.lua</code></span>
+    <p>Es la única excepción del repo a "todo en Lua". La sintaxis exacta de la API Lua 0.55/0.56 no se pudo extraer con confianza del wiki. El archivo de rescate es el que <strong>siempre</strong> tiene que arrancar — ahí la fiabilidad de hyprlang, sin duda posible, gana sobre la coherencia estética con el resto. Se porta a <code>.lua</code> cuando la sintaxis se verifique línea a línea.</p>
+  </div>
+
+  <h3>Imprescindible, sin construir</h3>
+  <div class="tw"><table>
+    <tr><th>Pieza</th><th>Esfuerzo</th><th>Nota</th></tr>
+    <tr><td><strong>Shell de QuickShell</strong></td><td class="num">2–3 sem</td><td>La pieza grande. Diseño ya cerrado en el mockup</td></tr>
+    <tr><td><strong><code>hyprland.lua</code> modular</strong></td><td class="num">2 días</td><td>El primer archivo Lua real del proyecto — verificar sintaxis contra el wiki en vivo, línea a línea</td></tr>
+    <tr><td><strong>Layouts en Lua</strong></td><td class="num">2–3 días</td><td><code>hl.layout.register</code> — ya no hacen falta plugins compilados</td></tr>
+    <tr><td><strong><code>theme.toml</code> + plantillas de matugen</strong></td><td class="num">3–4 días</td><td>Hoy la paleta vive escrita a mano en 3 sitios; <code>50-theme.sh</code> ya espera este archivo</td></tr>
+  </table></div>
+
+  <h3>Plantillas de tema · 12 pendientes</h3>
+  <p>Ya escritos: <strong>Neovim</strong>, <strong>Starship</strong>, y el <strong>tema de GRUB</strong>. Faltan Ghostty, btop, lazygit, lazydocker, yazi, bat, delta, fzf, hyprlock, GTK, Qt/Kvantum y herdr. Cada uno es un formato distinto: cuenta 1–2 horas. Es trabajo mecánico, pero sin él el sistema se ve inconsistente.</p>
+
+  <h3>Integraciones propias</h3>
+  <div class="tw"><table>
+    <tr><th>Pieza</th><th>Esfuerzo</th><th>Por qué importa</th></tr>
+    <tr><td><strong>Puente herdr → QuickShell</strong></td><td class="num">2–3 días</td><td>Lo más original del proyecto</td></tr>
+    <tr><td><strong>Motor de sesiones</strong></td><td class="num">2–3 días</td><td><code>dotctl dev open</code> restaura layout, rama y agentes</td></tr>
+    <tr><td><strong><code>tui-install</code></strong></td><td class="num">1 día</td><td><code>80-tui.sh</code> ya genera <code>.desktop</code> para 10 herramientas fijas; falta la versión bajo demanda</td></tr>
+    <tr><td><strong>Migraciones</strong></td><td class="num">1 día</td><td><code>doctor</code> ya lee <code>migrations/</code> y su estado; falta que la carpeta exista</td></tr>
+    <tr><td><strong>Panel de paquetes</strong></td><td class="num">1 día</td><td>fzf tematizado, lista unificada repos + AUR</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="n">六</span>RIESGOS</h2>
+  <div class="tw"><table>
+    <tr><th>Riesgo</th><th>Prob.</th><th>Mitigación</th></tr>
+    <tr><td>Los plugins de Hyprland rompen al actualizar</td><td style="color:var(--reversal)">Alta</td><td>Versión fijada en <code>packages/</code>. Con layouts en Lua, menos plugins que romper</td></tr>
+    <tr><td>La curva de QML alarga la Fase 4</td><td style="color:var(--reversal)">Alta</td><td>La Fase 2 te deja usable sin QML. La 4 empieza por lo trivial</td></tr>
+    <tr><td>Scope creep — el plan ya tiene un shader</td><td style="color:var(--amber)">Media</td><td><code>docs/decisions.md</code>: toda idea nueva espera a su fase</td></tr>
+    <tr><td>Cristal pesado → batería y FPS</td><td style="color:var(--amber)">Media</td><td>Degradación adaptativa por UPower, ahora escribible en la propia config Lua</td></tr>
+    <tr><td>Deriva estética al implementar</td><td style="color:var(--amber)">Media</td><td>Mockup antes que QML, siempre. Los tokens son ley</td></tr>
+    <tr><td>Quedarse construyendo tooling sin usar el escritorio</td><td style="color:var(--amber)">Media</td><td>La Fase 2 es innegociable antes que la 5</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2><span class="n">七</span>LOS PRÓXIMOS CUATRO PASOS</h2>
+
+  <div class="step"><div class="k">1</div><div>
+    <div class="t">Clonar y ejecutar</div>
+    <div class="d"><code>git clone &lt;repo&gt; ~/.limitless && cd ~/.limitless && ./install.sh</code>. Instala <code>gum</code>, y las 10 etapas corren solas — con progreso, spinners y errores mostrados, no en silencio.</div>
+  </div></div>
+
+  <div class="step"><div class="k">2</div><div>
+    <div class="t">Reiniciar y verificar</div>
+    <div class="d">El submenú <strong>«Arch Linux snapshots»</strong> en GRUB, ahora con el tema Limitless. El greeter <code>tuigreet</code> en la paleta remapeada. <code>dotctl doctor</code> sin fallos.</div>
+  </div></div>
+
+  <div class="step"><div class="k">3</div><div>
+    <div class="t">Comprobar el rescate</div>
+    <div class="d"><code>Ctrl+Alt+F2</code> → <code>Hyprland -c ~/.limitless/dev/minimal.conf</code>. Si esto arranca, cualquier fallo futuro del shell real es de configuración, no del sistema.</div>
+  </div></div>
+
+  <div class="step"><div class="k">4</div><div>
+    <div class="t">Fase 1</div>
+    <div class="d">Solo entonces. <code>hyprland.lua</code> bloque a bloque — el primer archivo Lua real del proyecto, verificado línea a línea contra el wiki en vivo — con el theming operativo desde el principio.</div>
+  </div></div>
+
+  <div class="note">
+    <span class="lbl">EL PASO QUE MÁS SE SUBESTIMA</span>
+    <p>El 3 parece trivial y decide si el proyecto es cómodo o doloroso. <strong>Un compositor que arranca desde treinta líneas es la diferencia entre depurar y adivinar.</strong> Ya está escrito — solo falta que tú lo confirmes en tu máquina.</p>
+  </div>
+</section>
+
+<footer>LIMITLESS OS · 蒼 + 赫 → 茈</footer>
+</div>

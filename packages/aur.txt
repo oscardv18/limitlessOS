@@ -1,0 +1,44 @@
+# packages/aur.txt — paquetes fuera de los repos oficiales, instalados con
+# `paru`. Formato idéntico a pacman.txt. install/stages/20-aur.sh instala
+# `paru` primero si no existe (es el único punto del instalador que compila
+# algo antes de tener un AUR helper).
+#
+# A diferencia de pacman.txt, un fallo aquí NO detiene el instalador: cada
+# paquete AUR es una compilación independiente, y una que falla no debe
+# tirar abajo las otras 20. 20-aur.sh continúa y reporta al final.
+
+# ── shell (§3.2) — completan lo que fish traía de fábrica ──────────────────
+zsh-fast-syntax-highlighting
+fzf-tab
+
+# ── shell de escritorio (§3.1, la pieza central del proyecto) ───────────────
+quickshell
+
+# ── plugins de Hyprland (Fase 3, LIMITLESS-OS.md) ───────────────────────────
+# Version-sensibles: rompen en cada actualización de Hyprland. dotctl doctor
+# debe avisar si la versión instalada no coincide con la que se compiló.
+hyprexpo
+hyprbars
+
+# ── agentes / sesiones (§3.2, la integración más original del proyecto) ────
+herdr
+
+# ── contenedores (§3.3) ──────────────────────────────────────────────────────
+lazydocker
+
+# ── sistema sin GUI (§3.4) — TUI que Arch no empaqueta en extra ────────────
+impala
+bluetui
+wiremix
+systemctl-tui
+
+# ── datos y HTTP (§3.3) ──────────────────────────────────────────────────────
+posting
+lazysql
+xh
+
+# ── medios (§3.5) ────────────────────────────────────────────────────────────
+rmpc
+
+# ── theming ──────────────────────────────────────────────────────────────────
+matugen-bin

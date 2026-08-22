@@ -1,0 +1,253 @@
+#  starship.toml — prompt «Limitless»
+#
+#  Conserva la ESTRUCTURA del prompt por defecto de Starship: dos líneas,
+#  módulos en el mismo orden, y el ❯ de siempre. Lo que cambia es la paleta,
+#  que es exactamente la de colors/limitless.lua, y una idea nueva: la
+#  telemetría se va al margen derecho, como los raíles del HUD.
+#
+#  Paleta (idéntica al colorscheme de Neovim):
+#    #3b9eff  蒼 azul      directorio, éxito
+#    #a970ff  茈 morado    rama de git
+#    #ff4a2e  赫 rojo      errores
+#    #8fe3ff  hielo        host, contexto
+#    #2ee6d6  cian         símbolos, contenedores
+#    #ffd25e  ámbar        versiones de lenguaje, duración
+#    #ff9d3d  naranja      estado de git en curso
+#    #ff6b7f  coral        marcadores de git status
+#    #4bf0a5  verde        añadido, node
+#    #ff5ecb  magenta      paquete
+#    #7e93b0  atenuado     usuario, texto secundario
+#    #6b7f9e  comentario   hora, ruido de fondo
+
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = true
+command_timeout = 800
+
+# ── Línea 1: quién, dónde, en qué rama, con qué versión ───────────────────────
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_commit\
+$git_state\
+$git_status\
+$git_metrics\
+$fill\
+$nodejs$rust$python$lua$golang$c$java$kotlin$ruby$php$zig$nix_shell\
+$docker_context\
+$package\
+$line_break\
+$jobs\
+$character"""
+
+# ── Margen derecho: telemetría, igual que los raíles del escritorio ───────────
+right_format = """$cmd_duration$status$time"""
+
+[fill]
+symbol = ' '
+
+# ── Identidad ────────────────────────────────────────────────────────────────
+[username]
+style_user = '#7e93b0'
+style_root = 'bold #ff4a2e'
+format = '[$user]($style)[@](fg:#46587a)'
+show_always = false
+disabled = false
+
+[hostname]
+ssh_only = true          # en local sobra; en remoto es crítico saber dónde estás
+style = '#8fe3ff'
+format = '[$hostname]($style) '
+ssh_symbol = '󰢹 '
+
+[directory]
+style = 'bold #3b9eff'
+format = '[$path]($style)[$read_only]($read_only_style) '
+truncation_length = 3
+truncate_to_repo = true
+truncation_symbol = '…/'
+read_only = ' 󰌾'
+read_only_style = '#ff4a2e'
+home_symbol = '~'
+
+[directory.substitutions]
+'Documents' = '󰈙'
+'Downloads' = ''
+'Music'     = ''
+'Pictures'  = ''
+'dev'       = '󰅩'
+
+# ── Git ──────────────────────────────────────────────────────────────────────
+# El morado de la rama viene del defecto de Starship y coincide con las
+# palabras clave del editor. No hubo que cambiarlo: ya encajaba.
+[git_branch]
+symbol = '⑂ '
+style = 'bold #a970ff'
+format = '[$symbol$branch]($style)'
+truncation_length = 24
+truncation_symbol = '…'
+
+[git_commit]
+style = '#a970ff'
+format = '[ ($hash$tag)]($style)'
+commit_hash_length = 7
+tag_symbol = ' 󰓹 '
+
+[git_state]
+style = 'bold #ff9d3d'
+format = '[ ($state( $progress_current/$progress_total))]($style)'
+rebase = 'REBASE'
+merge = 'MERGE'
+cherry_pick = 'CHERRY'
+bisect = 'BISECT'
+
+[git_status]
+style = '#ff6b7f'
+format = '[ $all_status$ahead_behind]($style)'
+conflicted = '󰞇 '
+ahead = '↑${count} '
+behind = '↓${count} '
+diverged = '↕↑${ahead_count}↓${behind_count} '
+untracked = '?${count} '
+stashed = '󰆓 '
+modified = '±${count} '
+staged = '+${count} '
+renamed = '»${count} '
+deleted = '✘${count} '
+
+[git_metrics]
+disabled = false
+added_style = '#4bf0a5'
+deleted_style = '#ff4a2e'
+format = '([+$added]($added_style) )([-$deleted]($deleted_style) )'
+
+# ── El carácter: el estado del último comando, en técnicas ────────────────────
+# 蒼 azul = atracción (salió bien) · 赫 rojo = reversión (falló)
+# Si prefieres el verde clásico de Starship: success_symbol = '[❯](bold #4bf0a5)'
+[character]
+success_symbol = '[❯](bold #3b9eff)'
+error_symbol   = '[❯](bold #ff4a2e)'
+vicmd_symbol   = '[❮](bold #a970ff)'
+
+[jobs]
+symbol = '󰜎 '
+style = 'bold #a970ff'
+format = '[$symbol$number]($style) '
+number_threshold = 1
+
+# ── Telemetría del margen derecho ────────────────────────────────────────────
+[cmd_duration]
+min_time = 2000
+style = '#ffd25e'
+format = '[󰔟 $duration]($style) '
+show_milliseconds = false
+
+[status]
+disabled = false
+style = '#ff4a2e'
+symbol = '✗'
+success_symbol = ''
+not_executable_symbol = '󰅚'
+not_found_symbol = '󰍉'
+sigint_symbol = '󰜺'
+signal_symbol = '󱐋'
+format = '[$symbol$common_meaning$signal_name$maybe_int]($style) '
+map_symbol = true
+pipestatus = true
+
+[time]
+disabled = false
+style = '#6b7f9e'
+format = '[$time]($style)'
+time_format = '%H:%M'
+
+# ── Lenguajes: mismos colores que los tipos del editor ───────────────────────
+[nodejs]
+symbol = ' '
+style = '#4bf0a5'
+format = '[$symbol($version )]($style)'
+
+[rust]
+symbol = ' '
+style = '#ff9d3d'
+format = '[$symbol($version )]($style)'
+
+[python]
+symbol = ' '
+style = '#ffd25e'
+format = '[$symbol($version )(\($virtualenv\) )]($style)'
+
+[lua]
+symbol = ' '
+style = '#3b9eff'
+format = '[$symbol($version )]($style)'
+
+[golang]
+symbol = ' '
+style = '#2ee6d6'
+format = '[$symbol($version )]($style)'
+
+[c]
+symbol = ' '
+style = '#8fe3ff'
+format = '[$symbol($version )]($style)'
+
+[java]
+symbol = ' '
+style = '#ff6b7f'
+format = '[$symbol($version )]($style)'
+
+[kotlin]
+symbol = ' '
+style = '#ff6b7f'
+format = '[$symbol($version )]($style)'
+
+[ruby]
+symbol = ' '
+style = '#ff4a2e'
+format = '[$symbol($version )]($style)'
+
+[php]
+symbol = ' '
+style = '#a970ff'
+format = '[$symbol($version )]($style)'
+
+[zig]
+symbol = ' '
+style = '#ff9d3d'
+format = '[$symbol($version )]($style)'
+
+[nix_shell]
+symbol = ' '
+style = '#8fe3ff'
+format = '[$symbol$state( \($name\) )]($style)'
+
+[docker_context]
+symbol = ' '
+style = '#2ee6d6'
+format = '[$symbol$context]($style) '
+only_with_files = true
+
+[package]
+symbol = '󰏗 '
+style = '#ff5ecb'
+format = '[$symbol$version]($style) '
+display_private = false
+
+# ── Ruido que el defecto muestra y aquí estorba ──────────────────────────────
+[battery]
+disabled = true          # ya está en la barra del shell
+[memory_usage]
+disabled = true          # ya está en la barra del shell
+[shlvl]
+disabled = false
+threshold = 2
+symbol = '󰅩 '
+style = '#6b7f9e'
+format = '[$symbol$shlvl]($style) '
+[aws]
+disabled = true
+[gcloud]
+disabled = true

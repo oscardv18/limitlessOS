@@ -1,0 +1,92 @@
+# system/grub/theme/theme.txt — tema de GRUB, mismo lenguaje visual que el
+# resto del sistema. Sintaxis verificada contra el manual de GNU GRUB y dos
+# temas reales (pop-os/grub-theme, Ste74/Grub2-Theme) — no es CSS, es un DSL
+# propio con bloques `+ componente { clave = valor }`.
+#
+# Deliberadamente sin imágenes: fondo de color plano (--void), nada de PNG
+# que generar ni mantener. Es la misma decisión que el greeter — techo
+# honesto de lo que se puede hacer sobre una pantalla de arranque, sin
+# fingir el liquid glass que no existe aquí.
+#
+# Las fuentes NO van en este repo como binario: install/stages/60-session.sh
+# las genera en la instalación con `grub-mkfont` a partir de
+# ttf-jetbrains-mono-nerd (ya en packages/pacman.txt), con -n "Limitless
+# Mono" fijo — así el nombre con el que se referencian aquí abajo
+# ("Limitless Mono 16", "Limitless Mono 24") es determinista y no depende
+# del nombre interno que traiga el .ttf.
+#
+# Paleta — igual que colors/limitless.lua y starship.toml:
+#   #04060d void · #7e93b0 dim · #3b9eff 蒼 azul · #a970ff 茈 morado
+#   #ff4a2e 赫 rojo · #46587a gutter/línea
+
+# ── propiedades globales ─────────────────────────────────────────────────────
+title-text: ""
+desktop-color: "#04060d"
+terminal-font: "Limitless Mono 16"
+terminal-border: "0"
+
+message-font: "Limitless Mono 16"
+message-color: "#eaf2ff"
+message-bg-color: "#0e1524"
+
+# ── marca, arriba — texto plano: los glifos del HUD (⬡, 蒼/赫/茈) son Nerd
+#    Font / CJK y no están garantizados en una fuente convertida a pf2 sin
+#    verificar cobertura de glifos. Aquí no se arriesga nada. ─────────────────
++ label {
+  top = 12%
+  left = 0
+  width = 100%
+  align = "center"
+  text = "L I M I T L E S S"
+  color = "#3b9eff"
+  font = "Limitless Mono 24"
+}
++ label {
+  top = 17%
+  left = 0
+  width = 100%
+  align = "center"
+  text = "CachyOS + Hyprland"
+  color = "#46587a"
+  font = "Limitless Mono 16"
+}
+
+# ── menú de arranque — incluye, sin configuración aparte, el submenú
+#    «Arch Linux snapshots» que añade grub-btrfs (LIMITLESS-OS.md §1):
+#    hereda este mismo estilo porque es una entrada de boot_menu más ────────
++ boot_menu {
+  left = 15%
+  top = 28%
+  width = 70%
+  height = 46%
+  item_font = "Limitless Mono 16"
+  item_color = "#7e93b0"
+  selected_item_color = "#3b9eff"
+  item_height = 34
+  item_spacing = 10
+  item_padding = 10
+}
+
+# ── cuenta atrás del timeout — id="__timeout__" es el nombre reservado
+#    que GRUB reconoce para sustituir %d por los segundos restantes ────────
++ label {
+  top = 90%
+  left = 0
+  width = 100%
+  align = "center"
+  id = "__timeout__"
+  text = "arrancando en %d s · ESC para el menú de instantáneas"
+  color = "#46587a"
+  font = "Limitless Mono 16"
+}
+
++ progress_bar {
+  id = "__timeout__"
+  left = 35%
+  top = 86%
+  width = 30%
+  height = 6
+  fg_color = "#3b9eff"
+  bg_color = "#0e1524"
+  border_color = "#1c2a40"
+}

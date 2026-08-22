@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# dot:summary=Diagnostica paquetes, symlinks, servicios y plugins en 5 segundos
+# dot:group=sistema
+# dot:glyph=⚕
+# dot:requires-sudo=false
+# dot:terminal=true
+#
+# La herramienta más usada del proyecto (LIMITLESS-OS.md §6). Convierte
+# "se me rompió algo" en un diagnóstico legible. Cada chequeo es best-effort
+# y honesto: si algo aún no existe en el repo (migraciones, QuickShell,
+# theme.toml), lo dice como "pendiente", no como fallo — el instalador y
+# doctor evolucionan juntos, no hace falta que doctor mienta sobre piezas
+# que todavía no se han construido.
+
+set -uo pipefail
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+source "$REPO_DIR/install/lib/ui.sh"
+
+PASS=0; WARN=0; FAIL=0
+
+check_ok()   { ui_ok "$1";   PASS=$((PASS+1)); }
+check_warn() { ui_warn "$1"; WARN=$((WARN+1)); }
+check_fail() { ui_fail "$1"; FAIL=$((FAIL+1)); }
+
+ui_banner "DOCTOR" "diagnóstico de Limitless OS"
+
+# ── 1. paquetes de packages/*.txt realmente instalados ──────────────────────
+ui_section 1 7 "Paquetes"
+for list in pacman aur; do
+  file="$REPO_DIR/packages/$list.txt"
+  [[ -f "$file" ]] || continue
+  missing=()
+  while IFS= read -r line; do
+    line="${line%%#*}"; line="$(echo -n "$line" | xargs)"
+    [[ -n "$line" ]] || continue
+    pacman -Qq "$line" >/dev/null 2>&1 || missing+=("$line")
+  done <"$file"
+  if (( ${#missing[@]} == 0 )); then
+    check_ok "$list.txt: todos instalados"
+  else
+    check_warn "$list.txt: faltan ${missing[*]}"
+  fi
+done
+
+# ── 2. symlinks de stow ───────────────────────────────────────────────────
+ui_section 2 7 "Symlinks de stow"
+if [[ -d "$REPO_DIR/stow" ]]; then
+  broken=0
+  while IFS= read -r -d '' link; do
+    [[ -e "$link" ]] || { broken=$((broken+1)); ui_warn "roto: $link"; }
+  done < <(find "$HOME" -maxdepth 4 -xtype l -lname "*$REPO_DIR/stow*" -print0 2>/dev/null)
+  (( broken == 0 )) && check_ok "sin symlinks rotos" || check_fail "$broken symlink(s) rotos"
+else
+  check_warn "stow/ no existe todavía"
+fi
+
+# ── 3. versión de Hyprland vs. la fijada para los plugins ───────────────────
+ui_section 3 7 "Versión de Hyprland"
+pin_file="$REPO_DIR/packages/hyprland.version"
+if has_cmd hyprctl; then
+  current="$(hyprctl version -j 2>/dev/null | grep -o '"tag":"[^"]*"' | cut -d'"' -f4)"
+  if [[ -f "$pin_file" ]]; then
+    pinned="$(cat "$pin_file")"
+    if [[ "$current" == "$pinned" ]]; then
+      check_ok "Hyprland $current == versión fijada"
+    else
+      check_warn "Hyprland $current, fijada $pinned — los plugins AUR pueden romperse tras actualizar"
+    fi
+  else
+    check_warn "sin versión fijada en packages/hyprland.version (echo $current > packages/hyprland.version)"
+  fi
+else
+  check_warn "Hyprland no está instalado todavía"
+fi
+
+# ── 4. migraciones pendientes ────────────────────────────────────────────────
+ui_section 4 7 "Migraciones"
+mig_dir="$REPO_DIR/migrations"
+state_dir="$HOME/.local/state/limitless/migrations"
+if [[ -d "$mig_dir" ]]; then
+  mkdir -p "$state_dir"
+  pending=0
+  for m in "$mig_dir"/*.sh; do
+    [[ -e "$m" ]] || continue
+    [[ -f "$state_dir/$(basename "$m")" ]] || pending=$((pending+1))
+  done
+  (( pending == 0 )) && check_ok "sin migraciones pendientes" || check_warn "$pending migración(es) pendiente(s) — dotctl migrate"
+else
+  ui_info "migrations/ aún no existe (plan-automation.md §5, pendiente)"
+fi
+
+# ── 5. servicios que la sesión necesita ──────────────────────────────────────
+ui_section 5 7 "Servicios"
+for svc in NetworkManager bluetooth; do
+  systemctl is-active --quiet "$svc" 2>/dev/null && check_ok "$svc activo" || check_warn "$svc no está activo"
+done
+for svc in pipewire wireplumber; do
+  systemctl --user is-active --quiet "$svc" 2>/dev/null && check_ok "$svc (usuario) activo" || check_warn "$svc (usuario) no está activo"
+done
+
+# ── 6. hex literales fuera de themes/ (plan.md §5, regla dura) ──────────────
+ui_section 6 7 "Hex fuera de themes/"
+if has_cmd rg; then
+  hits="$(rg -l --glob '!themes/**' --glob '*.qml' --glob '*.conf' --glob '*.lua' \
+    '#[0-9a-fA-F]{6}\b' "$REPO_DIR" 2>/dev/null | grep -v '/colors/limitless.lua' | grep -v '/starship.toml' || true)"
+  # nvim/colors y starship.toml son la excepción documentada: paletas ya
+  # escritas a mano hasta que exista la plantilla de matugen (spec-colorscheme.md §6)
+  if [[ -z "$hits" ]]; then
+    check_ok "sin hex fuera de themes/ (aparte de las excepciones documentadas)"
+  else
+    check_warn "hex encontrado fuera de themes/: $(echo "$hits" | tr '\n' ' ')"
+  fi
+else
+  ui_info "ripgrep no instalado, se omite este chequeo"
+fi
+
+# ── 7. sintaxis: qmllint / shellcheck ────────────────────────────────────────
+ui_section 7 7 "Lint"
+if has_cmd shellcheck; then
+  bad=0
+  while IFS= read -r -d '' f; do
+    shellcheck -S warning "$f" >/dev/null 2>&1 || bad=$((bad+1))
+  done < <(find "$REPO_DIR/install" "$REPO_DIR/bin" -name '*.sh' -o -name 'dotctl' -o -path '*/cmd/*' -print0 2>/dev/null)
+  (( bad == 0 )) && check_ok "shellcheck limpio" || check_warn "$bad script(s) con avisos de shellcheck"
+else
+  ui_info "shellcheck no instalado, se omite"
+fi
+if has_cmd qmllint; then
+  ui_info "qmllint disponible (sin .qml todavía que revisar)"
+else
+  ui_info "qmllint no instalado — hará falta en la Fase 4"
+fi
+
+ui_divider
+ui_banner "RESUMEN" "$PASS bien · $WARN avisos · $FAIL fallos"
+(( FAIL == 0 ))

@@ -1,0 +1,83 @@
+# packages/pacman.txt — paquetes de los repos oficiales (extra/core/multilib).
+# Formato: un paquete por línea. `#` inicia comentario. Instalado por
+# install/stages/10-core.sh vía `pacman -S --needed --noconfirm`.
+# Fuente de verdad: docs/LIMITLESS-OS.md §3.
+
+# ── red de seguridad (LIMITLESS-OS.md §1) ───────────────────────────────────
+snapper
+snap-pac
+grub-btrfs
+
+# ── base del sistema (§3.1) ──────────────────────────────────────────────────
+hyprland
+uwsm
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+hyprpolkitagent
+pipewire
+pipewire-pulse
+pipewire-alsa
+pipewire-jack
+wireplumber
+networkmanager
+hyprlock
+hypridle
+hyprcursor
+hyprpicker
+swww
+grim
+slurp
+wf-recorder
+
+# ── login (§2, system/greetd/) ──────────────────────────────────────────────
+greetd
+greetd-tuigreet
+
+# ── terminal y shell (§3.2) ──────────────────────────────────────────────────
+ghostty
+zsh
+zsh-autosuggestions
+zsh-completions
+starship
+zoxide
+fzf
+ripgrep
+fd
+eza
+bat
+git-delta
+dust
+duf
+procs
+
+# ── desarrollo (§3.3) ──────────────────────────────────────────────────────
+neovim
+lazygit
+github-cli
+jq
+yq
+hyperfine
+
+# ── sistema sin GUI (§3.4) ───────────────────────────────────────────────────
+btop
+nvtop
+yazi
+lnav
+noto-fonts-cjk        # los kanji (蒼/赫/茈) del HUD y del greeter
+ttf-jetbrains-mono-nerd
+terminus-font          # fuente de la consola virtual, system/vconsole/README.md
+freetype2               # dependencia opcional de grub-mkfont; sin ella no rasteriza (system/grub/theme/)
+
+# ── medios (§3.5) ────────────────────────────────────────────────────────────
+mpv
+imv
+zathura
+zathura-pdf-mupdf
+
+# ── utilidades de captura / portapapeles ────────────────────────────────────
+cliphist
+wl-clipboard
+satty
+
+# ── herramientas de compilación (para paquetes AUR) ─────────────────────────
+base-devel

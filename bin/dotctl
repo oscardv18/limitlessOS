@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# bin/dotctl — router único (plan-automation.md §3).
+#
+# Sin lógica propia: localiza bin/cmd/<verbo>[-<sustantivo>...], la ejecuta,
+# y le pasa el resto de argumentos. Añadir un comando = crear un archivo con
+# su cabecera de metadatos `# dot:clave=valor`; nada más que tocar, ni aquí
+# ni en ningún keybind — los keybinds llaman siempre a `dotctl …`, nunca a
+# un script directamente (plan-automation.md §3, último párrafo).
+
+set -uo pipefail
+CMD_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/cmd" &>/dev/null && pwd)"
+
+_usage() {
+  echo "uso: dotctl <comando> [args...]"
+  echo
+  echo "comandos disponibles:"
+  local f base
+  for f in "$CMD_DIR"/*; do
+    [[ -x "$f" ]] || continue
+    base="$(basename "$f")"
+    local summary
+    summary="$(grep -m1 '^# dot:summary=' "$f" 2>/dev/null | cut -d= -f2-)"
+    printf '  %-22s %s\n' "${base//-/ }" "${summary:-}"
+  done
+}
+
+[[ $# -eq 0 ]] && { _usage; exit 0; }
+
+# de más específico a más genérico: "pkg install foo" busca primero
+# cmd/pkg-install-foo (no debería existir), luego cmd/pkg-install,
+# luego cmd/pkg, pasando lo sobrante como argumentos.
+_args=("$@")
+_name=""
+_i=${#_args[@]}
+while (( _i > 0 )); do
+  _candidate="$(IFS=-; echo "${_args[*]:0:_i}")"
+  if [[ -x "$CMD_DIR/$_candidate" ]]; then
+    _name="$_candidate"
+    break
+  fi
+  _i=$((_i - 1))
+done
+
+if [[ -z "$_name" ]]; then
+  echo "dotctl: comando desconocido: $*" >&2
+  _usage
+  exit 1
+fi
+
+exec "$CMD_DIR/$_name" "${_args[@]:_i}"
