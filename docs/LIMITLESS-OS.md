@@ -60,10 +60,10 @@ No es tan cómodo, pero cubre el caso que de verdad te va a pasar.
 
 ### Capa 3 — Configuración mínima conocida-buena
 
-En el repo, `dev/minimal.lua`: una config de Hyprland de ~30 líneas sin plugins, sin Quickshell, sin cristal. Solo un compositor que arranca y abre un terminal. El procedimiento de rescate se reduce a:
+En el repo, `dev/minimal.conf`: una config de Hyprland de ~30 líneas sin plugins, sin Quickshell, sin cristal. Solo un compositor que arranca y abre un terminal. El procedimiento de rescate se reduce a:
 
 ```
-Ctrl+Alt+F2  →  Hyprland -c ~/.limitless/dev/minimal.lua
+Ctrl+Alt+F2  →  Hyprland -c ~/.limitless/dev/minimal.conf
 ```
 
 Si eso arranca, el problema está en tu configuración. Si no arranca, es el sistema, y toca instantánea. **Ese diagnóstico de 30 segundos es lo que evita las noches perdidas.**
@@ -74,7 +74,7 @@ Si eso arranca, el problema está en tu configuración. Si no arranca, es el sis
 
 | Síntoma | Acción |
 |---|---|
-| Hyprland no arranca | `Ctrl+Alt+F2` → `Hyprland -c ~/.limitless/dev/minimal.lua` |
+| Hyprland no arranca | `Ctrl+Alt+F2` → `Hyprland -c ~/.limitless/dev/minimal.conf` |
 | Arranca pero sin barra ni dock | `qs -c limitless` en un terminal, leer el error |
 | Rompió tras `dotctl update` | `limitless rollback` (última instantánea) |
 | Rompió tras `pacman -Syu` | Reiniciar → GRUB → submenú **Arch Linux snapshots** |
@@ -293,7 +293,7 @@ Reglas para todas: **idempotentes** (ejecutar dos veces no rompe nada), **marcad
 
 | Fase | Contenido | Terminas cuando |
 |---|---|---|
-| **0 · Terreno** | Auditar lo ya instalado. Activar instantáneas en GRUB. Repo, `install.sh` con etapas vacías, `dev/minimal.lua`, rescate en el README | Ves el submenú de instantáneas en GRUB **y** arrancas `Hyprland -c dev/minimal.lua` desde TTY |
+| **0 · Terreno** | Auditar lo ya instalado. Activar instantáneas en GRUB. Repo, `install.sh` con etapas vacías, `dev/minimal.conf`, rescate en el README | Ves el submenú de instantáneas en GRUB **y** arrancas `Hyprland -c dev/minimal.conf` desde TTY |
 | **1 · Núcleo** | `hyprland.lua` modular, cristal, workspaces semánticos, scratchpads, **`theme.toml` + matugen operativos** | Sesión completa por teclado, con un solo tema gobernando todo |
 | **2 · Habitable** | Ghostty, zsh + 3 plugins, starship, neovim, yazi, btop, lazygit, herdr, impala, bluetui, portapapeles, capturas | **Trabajas el día entero aquí.** Hito crítico |
 | **3 · Sesión** | greetd + tuigreet + paleta del VT, hyprlock, hypridle, notificaciones, OSD, uwsm | Entras desde el greeter, bloqueas, reanudas y el sistema te avisa |
@@ -316,7 +316,7 @@ Me preguntaste explícitamente. Esto es lo que **no existe** y hay que escribir:
 | **Instalador por etapas** | 2–3 días | §5. El más crítico: sin GUI, un instalador a medias te deja sin sistema |
 | **`hyprland.lua` modular** | 2 días | En Lua desde el commit 1 |
 | **`dotctl` + cabeceras** | 1 tarde | El router (`plan-automation.md` §3) |
-| **`dev/minimal.lua`** | 1 hora | Config de rescate. La hora mejor invertida del proyecto |
+| **`dev/minimal.conf`** | 1 hora | Config de rescate. La hora mejor invertida del proyecto |
 | **Shell de Quickshell** | 2–3 semanas | La pieza grande. Diseño ya cerrado en el mockup |
 | **Layouts Lua** (scroll, focus, grid) | 2–3 días | `hl.layout.register` — ya no hacen falta plugins |
 
@@ -350,7 +350,7 @@ Ya escritos: **Neovim** y **Starship**. Faltan, y cada uno es un formato distint
 
 1. **Auditar el sistema instalado**: sistema de archivos, cifrado, subvolúmenes, paquetes de instantáneas.
 2. **Montar la red de seguridad primero**: `snapper` + `snap-pac` + `grub-btrfs`, y comprobar que el submenú aparece en GRUB. Antes de instalar nada más.
-3. Desde TTY: git, clonar, y **verificar que `dev/minimal.lua` arranca**.
+3. Desde TTY: git, clonar, y **verificar que `dev/minimal.conf` arranca**.
 4. Solo entonces, la Fase 1.
 
 El paso 2 va antes que todo lo demás a propósito: es la única parte del plan que te protege **mientras construyes el resto**. Y el paso 3 parece trivial pero decide si el proyecto es cómodo o doloroso — un compositor que arranca desde 30 líneas es la diferencia entre depurar y adivinar.
