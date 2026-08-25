@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=Discord
+StartupWMClass=discord
+Comment=All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
+GenericName=Internet Messenger
+Exec=bash -c 'exec "$HOME/.limitless/bin/discord-wayland" "$@"' _ %U
+Icon=discord
+Type=Application
+Categories=Network;InstantMessaging;Chat;
+Path=/usr/bin
+Terminal=false
+StartupNotify=true
+MimeType=x-scheme-handler/discord;
+X-Limitless-Glyph=◈

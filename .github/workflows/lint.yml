@@ -1,0 +1,170 @@
+name: Lint
+
+# ==============================================================================
+# Limitless OS — CI Linting Workflow
+# ==============================================================================
+# Ejecuta validaciones estáticas y análisis de código en push y pull request:
+# 1. shellcheck: análisis estático de scripts shell — bloqueante en severidad
+#    "error", informativo en "warning" hasta que exista una corrida de
+#    referencia limpia (ningún script se verificó contra el binario real
+#    todavía, ver el paso "Ejecutar ShellCheck").
+# 2. bash -n: validación de sintaxis para todos los scripts bash.
+# 3. qmllint: validación de componentes QML en stow/quickshell/ (protegido).
+# ==============================================================================
+
+'on':
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: ShellCheck — Análisis estático de calidad y buenas prácticas en scripts
+  # ----------------------------------------------------------------------------
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Ejecutar ShellCheck
+        run: |
+          echo "==> Buscando scripts shell para analizar..."
+          # Localizar todos los scripts shell (.sh, ejecutables en bin/, instalador raíz)
+          mapfile -t scripts < <(find . -type f \( -name "*.sh" -o -path "./bin/*" \) -not -path "*/.git/*" | sort -u)
+
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No se encontraron scripts shell para analizar."
+            exit 0
+          fi
+
+          echo "Scripts encontrados (${#scripts[@]}):"
+          printf '  - %s\n' "${scripts[@]}"
+          echo "------------------------------------------------------------"
+
+          # shellcheck viene preinstalado en el entorno ubuntu-latest de GitHub Actions.
+          #
+          # Ningún script de este repo se ha corrido nunca contra un shellcheck
+          # real (se escribieron desde Windows, sin el binario disponible) —
+          # así que hasta que exista una corrida limpia de referencia, el job
+          # NO bloquea por avisos de severidad "warning" (mismo criterio que
+          # bin/cmd/doctor, que los trata como check_warn, no check_fail).
+          # Los de severidad "error" sí son bloqueantes: son bugs reales de
+          # sintaxis/semántica, no estilo, y no hay motivo para tolerarlos.
+          echo "── severidad 'error' (bloqueante) ──"
+          shellcheck -S error "${scripts[@]}"
+          echo "==> Sin errores de shellcheck."
+
+          echo
+          echo "── severidad 'warning' (informativo, no bloquea todavía) ──"
+          shellcheck -S warning "${scripts[@]}" || \
+            echo "Hay avisos de nivel warning — revísalos cuando haya una corrida de referencia, pero no fallan este job por ahora."
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Bash Syntax Check — Validación estricta de sintaxis (bash -n)
+  # ----------------------------------------------------------------------------
+  bash-syntax:
+    name: Bash Syntax (bash -n)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Validar sintaxis bash
+        run: |
+          echo "==> Validando sintaxis bash con 'bash -n'..."
+          mapfile -t scripts < <(find . -type f \( -name "*.sh" -o -path "./bin/*" \) -not -path "*/.git/*" | sort -u)
+
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No se encontraron scripts para validar."
+            exit 0
+          fi
+
+          echo "Validando ${#scripts[@]} scripts:"
+          failed=0
+          for script in "${scripts[@]}"; do
+            if bash -n "$script"; then
+              echo "  [OK]   $script"
+            else
+              echo "  [FAIL] $script" >&2
+              failed=$((failed + 1))
+            fi
+          done
+
+          echo "------------------------------------------------------------"
+          if [ "$failed" -gt 0 ]; then
+            echo "Error: $failed script(s) contienen errores de sintaxis." >&2
+            exit 1
+          fi
+          echo "==> Todos los scripts pasaron la validación de sintaxis bash."
+
+  # ----------------------------------------------------------------------------
+  # Job 3: QML Lint — Verificación de sintaxis y tipos en componentes QuickShell
+  # ----------------------------------------------------------------------------
+  qmllint:
+    name: QML Lint (qmllint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Comprobar existencia de archivos QML
+        id: check-qml
+        run: |
+          # Verificar si existen archivos .qml en stow/quickshell/
+          if [ -d "stow/quickshell" ]; then
+            mapfile -t qml_files < <(find stow/quickshell -type f -name "*.qml" 2>/dev/null | sort -u)
+          else
+            qml_files=()
+          fi
+
+          count=${#qml_files[@]}
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Archivos .qml encontrados en stow/quickshell/: $count"
+
+      - name: Instalar herramientas Qt (qmllint)
+        if: steps.check-qml.outputs.count > 0
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qt6-declarative-dev-tools qt6-base-dev
+
+      - name: Ejecutar qmllint sobre archivos QML
+        if: steps.check-qml.outputs.count > 0
+        run: |
+          # Asegurar que las herramientas de Qt6 estén en PATH
+          export PATH="/usr/lib/qt6/bin:$PATH"
+
+          QMLLINT_BIN="$(command -v qmllint || echo '/usr/lib/qt6/bin/qmllint')"
+          if [ ! -x "$QMLLINT_BIN" ]; then
+            echo "Error: no se encontró el ejecutable qmllint." >&2
+            exit 1
+          fi
+
+          mapfile -t qml_files < <(find stow/quickshell -type f -name "*.qml" | sort -u)
+          echo "Ejecutando $QMLLINT_BIN sobre ${#qml_files[@]} archivos .qml..."
+
+          failed=0
+          for f in "${qml_files[@]}"; do
+            echo "Analizando: $f"
+            if ! "$QMLLINT_BIN" "$f"; then
+              failed=$((failed + 1))
+            fi
+          done
+
+          if [ "$failed" -gt 0 ]; then
+            echo "Error: $failed archivo(s) QML fallaron la validación de qmllint." >&2
+            exit 1
+          fi
+          echo "==> Validación de qmllint completada exitosamente."
+
+      - name: Mensaje informativo (sin QML aún)
+        if: steps.check-qml.outputs.count == 0
+        run: |
+          echo "No se encontraron archivos .qml en stow/quickshell/ (pendiente de construcción en Fase 4)."
+          echo "==> Paso protegido completado sin errores."

@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# dot:summary=Desinstalador interactivo de paquetes instalados en el sistema
+# dot:group=sistema
+# dot:glyph=▣
+# dot:requires-sudo=true
+# dot:terminal=true
+#
+# Flujo interactivo de desinstalación de paquetes (spec-package-panel.md §3.3).
+# Lista los paquetes actualmente instalados en el sistema con previsualización
+# de tamaño, dependencias y descripción vía pacman -Qi. Tras desinstalar con
+# pacman -Rns, actualiza automáticamente los manifiestos packages/*.txt.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_banner() { echo "=== $1 ==="; }
+  ui_ok()     { echo "  [OK]  $1"; }
+  ui_fail()   { echo "  [ERR] $1"; }
+  ui_warn()   { echo "  [WARN] $1"; }
+  ui_info()   { echo "  [INFO] $1"; }
+fi
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# escapa metacaracteres de ERE antes de meter un nombre de paquete en un
+# patrón de grep -E — mismo motivo y misma función que en bin/cmd/pkg-install.
+regex_escape() {
+  printf '%s' "$1" | sed -e 's/[.[\*^$()+?{}|\\]/\\&/g'
+}
+
+# ── sudo keepalive ───────────────────────────────────────────────────────────
+SUDO_KEEPALIVE_PID=""
+sudo_keepalive_start() {
+  sudo -v || return 1
+  ( while true; do sudo -n true; sleep 60; kill -0 "$$" 2>/dev/null || exit; done ) &
+  SUDO_KEEPALIVE_PID=$!
+}
+
+sudo_keepalive_stop() {
+  if [[ -n "${SUDO_KEEPALIVE_PID:-}" ]]; then
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    unset SUDO_KEEPALIVE_PID
+  fi
+}
+trap sudo_keepalive_stop EXIT INT TERM
+
+# ── limpieza de manifiestos ──────────────────────────────────────────────────
+remove_from_manifest() {
+  local manifest="$1"
+  shift
+  local -a pkgs=("$@")
+  [[ -f "$manifest" ]] || return 0
+
+  local removed=()
+  for pkg in "${pkgs[@]}"; do
+    local pkg_re; pkg_re="$(regex_escape "$pkg")"
+    if grep -Eq "^[[:space:]]*${pkg_re}([[:space:]]*#|[[:space:]]*$)" "$manifest" 2>/dev/null; then
+      local tmp; tmp="$(mktemp)"
+      grep -Ev "^[[:space:]]*${pkg_re}([[:space:]]*#|[[:space:]]*$)" "$manifest" > "$tmp" && mv "$tmp" "$manifest"
+      removed+=("$pkg")
+    fi
+  done
+
+  if (( ${#removed[@]} > 0 )); then
+    ui_ok "$(basename "$manifest") limpiado (-${removed[*]})"
+  fi
+}
+
+# ── ayuda ─────────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "uso: dotctl pkg remove [paquete...]"
+  echo
+  echo "Desinstalador interactivo de paquetes del sistema."
+  echo "Si no se especifican paquetes, abre el selector interactivo fzf."
+  echo
+  echo "Atajos en el selector (fzf):"
+  echo "  Tab       Marcar / desmarcar múltiples paquetes"
+  echo "  Alt-p     Alternar panel de vista previa"
+  echo "  Alt-j/k   Desplazar panel de vista previa"
+  echo "  Enter     Desinstalar paquetes seleccionados"
+  echo "  Esc       Cancelar y salir"
+  exit 0
+fi
+
+if ! has_cmd pacman; then
+  ui_fail "pacman no está disponible en este sistema."
+  exit 1
+fi
+
+selected_packages=()
+
+if [[ $# -gt 0 ]]; then
+  for arg in "$@"; do
+    selected_packages+=("$arg")
+  done
+else
+  if ! has_cmd fzf; then
+    ui_fail "fzf no está instalado. Especifica los paquetes a eliminar: dotctl pkg remove <pkg>"
+    exit 1
+  fi
+
+  fzf_colors="fg:#e5e9f0,fg+:#0ea5e9,bg:-1,bg+:#12141c,border:#94a3b824,pointer:#0ea5e9,marker:#6d28d9,prompt:#6d28d9,info:#64748b"
+
+  fzf_opts=(
+    --multi
+    --pointer '❯'
+    --marker '◈'
+    --prompt '◈ REMOVE › '
+    --header 'Tab: marcar · Alt-p: preview · Alt-j/k: scroll · Enter: desinstalar'
+    --preview 'pacman -Qi {1} 2>/dev/null'
+    --preview-window 'right:55%:border-left'
+    --border none
+    --color "$fzf_colors"
+    --bind 'alt-p:toggle-preview'
+    --bind 'alt-j:preview-down,alt-k:preview-up'
+  )
+
+  raw_selection="$(pacman -Qq 2>/dev/null | sort -u | fzf "${fzf_opts[@]}")" || true
+
+  if [[ -z "$raw_selection" ]]; then
+    ui_info "Operación cancelada. No se seleccionaron paquetes para eliminar."
+    exit 0
+  fi
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && selected_packages+=("$line")
+  done <<< "$raw_selection"
+fi
+
+if (( ${#selected_packages[@]} == 0 )); then
+  ui_info "No hay paquetes seleccionados."
+  exit 0
+fi
+
+ui_banner "DESINSTALACIÓN DE PAQUETES" "Limitless OS Package Manager"
+ui_warn "Se van a desinstalar los siguientes paquetes y sus dependencias huérfanas:"
+for pkg in "${selected_packages[@]}"; do
+  echo "  - $pkg"
+done
+echo
+
+sudo_keepalive_start || {
+  ui_fail "No se pudo obtener privilegios de sudo."
+  exit 1
+}
+
+ui_info "Ejecutando sudo pacman -Rns..."
+if sudo pacman -Rns "${selected_packages[@]}"; then
+  ui_ok "Paquetes desinstalados correctamente."
+  remove_from_manifest "$REPO_DIR/packages/pacman.txt" "${selected_packages[@]}"
+  remove_from_manifest "$REPO_DIR/packages/aur.txt" "${selected_packages[@]}"
+
+  if has_cmd notify-send; then
+    notify-send -a "Limitless OS" -i package-remove \
+      "Desinstalación completada" \
+      "Se eliminaron: ${selected_packages[*]}" 2>/dev/null || true
+  fi
+  ui_info "Manifiestos en packages/ sincronizados."
+  exit 0
+else
+  ui_fail "Error durante la desinstalación de paquetes."
+  exit 1
+fi

@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# dot:summary=Gestor de paquetes unificado de Limitless OS (install, search, remove)
+# dot:group=sistema
+# dot:glyph=▣
+# dot:requires-sudo=true
+# dot:terminal=true
+#
+# Router y punto de entrada para la gestión de paquetes en Limitless OS.
+# Despacha a los subcomandos específicos o ejecuta el instalador interactivo
+# por defecto (spec-package-panel.md).
+
+set -uo pipefail
+
+CMD_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")" &>/dev/null && pwd)"
+REPO_DIR="$(cd -- "$CMD_DIR/../.." &>/dev/null && pwd)"
+
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_banner() { echo "=== $1 ==="; }
+  ui_ok()     { echo "  [OK]  $1"; }
+  ui_fail()   { echo "  [ERR] $1"; }
+  ui_warn()   { echo "  [WARN] $1"; }
+  ui_info()   { echo "  [INFO] $1"; }
+fi
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+_usage() {
+  echo "uso: dotctl pkg <subcomando> [argumentos...]"
+  echo
+  echo "Subcomandos disponibles:"
+  echo "  install   Buscador e instalador unificado oficial + AUR (por defecto)"
+  echo "  search    Búsqueda y consulta de información / PKGBUILD"
+  echo "  remove    Desinstalador interactivo de paquetes del sistema"
+  echo "  outdated  Comprueba paquetes desactualizados (checkupdates + yay/paru)"
+  echo "  sync      Compara paquetes instalados con manifiestos en packages/"
+  echo
+  echo "Si se invoca sin argumentos ('dotctl pkg'), se inicia el instalador interactivo."
+}
+
+subcmd="${1:-install}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+case "$subcmd" in
+  install)
+    exec "$CMD_DIR/pkg-install" "$@"
+    ;;
+  search)
+    exec "$CMD_DIR/pkg-search" "$@"
+    ;;
+  remove)
+    exec "$CMD_DIR/pkg-remove" "$@"
+    ;;
+  outdated)
+    ui_banner "ACTUALIZACIONES PENDIENTES" "Verificación de paquetes"
+    echo "── Repositorios oficiales ──"
+    if has_cmd checkupdates; then
+      checkupdates || echo "Todos los paquetes oficiales están al día."
+    else
+      ui_warn "checkupdates (del paquete pacman-contrib) no está disponible."
+    fi
+
+    echo
+    echo "── Repositorio AUR ──"
+    if has_cmd yay; then
+      yay -Qua || echo "Todos los paquetes AUR están al día."
+    elif has_cmd paru; then
+      paru -Qua || echo "Todos los paquetes AUR están al día."
+    else
+      ui_info "Helper de AUR no instalado."
+    fi
+    ;;
+  sync)
+    if [[ -x "$CMD_DIR/pkg-sync" ]]; then
+      exec "$CMD_DIR/pkg-sync" "$@"
+    else
+      ui_banner "SINCRONIZACIÓN DE PAQUETES" "Manifiestos vs Sistema"
+      for list in pacman aur; do
+        file="$REPO_DIR/packages/$list.txt"
+        [[ -f "$file" ]] || continue
+        echo "── $list.txt ──"
+        missing=()
+        while IFS= read -r line; do
+          line="${line%%#*}"; line="$(echo -n "$line" | xargs)"
+          [[ -n "$line" ]] || continue
+          pacman -Qq "$line" >/dev/null 2>&1 || missing+=("$line")
+        done <"$file"
+        if (( ${#missing[@]} == 0 )); then
+          ui_ok "Todos los paquetes de $list.txt están instalados."
+        else
+          ui_warn "Faltan por instalar: ${missing[*]}"
+        fi
+      done
+    fi
+    ;;
+  -h|--help|help)
+    _usage
+    exit 0
+    ;;
+  *)
+    echo "dotctl pkg: subcomando desconocido '$subcmd'" >&2
+    _usage
+    exit 1
+    ;;
+esac

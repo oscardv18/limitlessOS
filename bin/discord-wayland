@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# bin/discord-wayland — Envoltorio de Discord con soporte nativo de Wayland y PipeWire ScreenCast.
+#
+# Referencia: docs/spec-keybinds.md §4c
+# Discord (Electron) corre bajo XWayland por defecto y no puede capturar pantallas o ventanas Wayland.
+# Este envoltorio pasa los flags obligatorios de Ozone y WebRTCPipeWireCapturer para habilitar Wayland nativo
+# y compartir pantalla mediante xdg-desktop-portal-hyprland / PipeWire.
+#
+# Invocado por stow/applications/.local/share/applications/discord.desktop, que
+# resuelve esta ruta vía `bash -c '... "$HOME/.limitless/bin/discord-wayland" ...'`
+# — no por PATH. Este script en concreto no lo necesita, pero `~/.limitless/bin/`
+# en general SÍ tenía ese hueco: `dotctl` mismo no era invocable por nombre
+# suelto (LightDM → uwsm → Hyprland no pasa por ningún rc de shell). Ya está
+# resuelto con un symlink a /usr/local/bin/dotctl en install/stages/40-stow.sh
+# — este script sigue por ruta absoluta porque, a diferencia de dotctl, nada
+# más en el ecosistema lo invoca por nombre suelto.
+
+set -euo pipefail
+
+exec discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland "$@"

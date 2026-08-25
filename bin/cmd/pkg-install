@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+# dot:summary=Buscador e instalador interactivo de paquetes oficiales y AUR
+# dot:group=sistema
+# dot:glyph=▣
+# dot:requires-sudo=true
+# dot:terminal=true
+#
+# Flujo interactivo de búsqueda e instalación de paquetes (spec-package-panel.md).
+# Presenta una lista unificada de paquetes de repositorios oficiales y AUR,
+# filtrando los ya instalados. Cuenta con previsualización en vivo de detalles y
+# PKGBUILD (alt-b), gestión de sudo keepalive y actualización automática de los
+# manifiestos en packages/ (pacman.txt y aur.txt).
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_banner() { echo "=== $1 ==="; }
+  ui_ok()     { echo "  [OK]  $1"; }
+  ui_fail()   { echo "  [ERR] $1"; }
+  ui_warn()   { echo "  [WARN] $1"; }
+  ui_info()   { echo "  [INFO] $1"; }
+fi
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# escapa metacaracteres de ERE antes de meter un nombre de paquete en un
+# patrón de grep -E — "." y "+" son válidos en nombres de paquete de Arch
+# (p. ej. "python3.12") y sin esto se interpretan como regex, no literal.
+regex_escape() {
+  printf '%s' "$1" | sed -e 's/[.[\*^$()+?{}|\\]/\\&/g'
+}
+
+detect_aur_helper() {
+  if has_cmd yay; then
+    echo "yay"
+  elif has_cmd paru; then
+    echo "paru"
+  else
+    echo ""
+  fi
+}
+
+# ── sudo keepalive (spec-package-panel.md §1) ────────────────────────────────
+SUDO_KEEPALIVE_PID=""
+sudo_keepalive_start() {
+  sudo -v || return 1
+  ( while true; do sudo -n true; sleep 60; kill -0 "$$" 2>/dev/null || exit; done ) &
+  SUDO_KEEPALIVE_PID=$!
+}
+
+sudo_keepalive_stop() {
+  if [[ -n "${SUDO_KEEPALIVE_PID:-}" ]]; then
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    unset SUDO_KEEPALIVE_PID
+  fi
+}
+trap sudo_keepalive_stop EXIT INT TERM
+
+# ── actualización de manifiestos (spec-package-panel.md §3.2) ────────────────
+update_manifest() {
+  local manifest="$1"
+  shift
+  local -a pkgs=("$@")
+  [[ -f "$manifest" ]] || return 0
+
+  local -a added=()
+  for pkg in "${pkgs[@]}"; do
+    local pkg_re; pkg_re="$(regex_escape "$pkg")"
+    if ! grep -Eq "^[[:space:]]*${pkg_re}([[:space:]]*#|[[:space:]]*$)" "$manifest" 2>/dev/null; then
+      echo "$pkg" >> "$manifest"
+      added+=("$pkg")
+    fi
+  done
+
+  if (( ${#added[@]} > 0 )); then
+    ui_ok "$(basename "$manifest") actualizado (+${added[*]})"
+  fi
+}
+
+# ── generador de lista unificada (spec-package-panel.md §3.1, §3.3) ──────────
+get_available_packages() {
+  local installed_tmp
+  installed_tmp="$(mktemp)"
+  pacman -Qq 2>/dev/null | sort -u > "$installed_tmp"
+
+  # Repositorios oficiales: formato repo/paquete
+  pacman -Sl 2>/dev/null | awk '
+    NR==FNR { inst[$1]=1; next }
+    !($2 in inst) { print $1 "/" $2 }
+  ' "$installed_tmp" -
+
+  # AUR: formato aur/paquete
+  local helper
+  helper="$(detect_aur_helper)"
+  if [[ -n "$helper" ]]; then
+    comm -23 <("$helper" -Slqa 2>/dev/null | sort -u) "$installed_tmp" | awk '{print "aur/" $1}'
+  fi
+
+  rm -f "$installed_tmp"
+}
+
+# ── ayuda ─────────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "uso: dotctl pkg install [paquete...]"
+  echo
+  echo "Buscador e instalador interactivo de paquetes oficiales y AUR."
+  echo "Si no se especifican paquetes, se abre el panel TUI interactivo."
+  echo
+  echo "Atajos en el panel interactivo (fzf):"
+  echo "  Tab       Marcar / desmarcar múltiples paquetes"
+  echo "  Alt-p     Alternar vista previa"
+  echo "  Alt-b     Ver PKGBUILD (seguridad para paquetes AUR)"
+  echo "  Alt-i     Ver información detallada del paquete"
+  echo "  Alt-j/k   Desplazar panel de vista previa"
+  echo "  Enter     Instalar paquetes seleccionados"
+  echo "  Esc       Cancelar y salir"
+  exit 0
+fi
+
+# ── validación de dependencias ───────────────────────────────────────────────
+if ! has_cmd pacman; then
+  ui_fail "pacman no está disponible en este sistema."
+  exit 1
+fi
+
+selected_packages=()
+
+if [[ $# -gt 0 ]]; then
+  # Modo no interactivo directo desde línea de comandos
+  for arg in "$@"; do
+    selected_packages+=("$arg")
+  done
+else
+  # Modo interactivo con fzf
+  if ! has_cmd fzf; then
+    ui_fail "fzf no está instalado. Instálalo o pasa los paquetes como argumentos: dotctl pkg install <pkg>"
+    exit 1
+  fi
+
+  preview_info_cmd='
+    target="{1}"
+    repo="${target%%/*}"
+    pkg="${target#*/}"
+    if [[ "$repo" == "aur" ]]; then
+      if command -v yay >/dev/null 2>&1; then
+        yay -Siia "$pkg" 2>/dev/null || yay -Sii "$pkg" 2>/dev/null
+      elif command -v paru >/dev/null 2>&1; then
+        paru -Siia "$pkg" 2>/dev/null || paru -Sii "$pkg" 2>/dev/null
+      else
+        echo "Detalles de AUR no disponibles (falta yay/paru)"
+      fi
+    else
+      pacman -Sii "$target" 2>/dev/null || pacman -Sii "$pkg" 2>/dev/null
+    fi
+  '
+
+  preview_pkgbuild_cmd='
+    target="{1}"
+    pkg="${target#*/}"
+    if command -v yay >/dev/null 2>&1; then
+      yay -Gpa "$pkg" 2>/dev/null || echo "No se pudo obtener PKGBUILD para $pkg"
+    elif command -v paru >/dev/null 2>&1; then
+      paru -Gp "$pkg" 2>/dev/null || echo "No se pudo obtener PKGBUILD para $pkg"
+    else
+      echo "yay o paru requerido para previsualizar PKGBUILD (alt-b)"
+    fi
+  '
+
+  fzf_colors="fg:#e5e9f0,fg+:#0ea5e9,bg:-1,bg+:#12141c,border:#94a3b824,pointer:#0ea5e9,marker:#6d28d9,prompt:#6d28d9,info:#64748b"
+
+  fzf_opts=(
+    --multi
+    --pointer '❯'
+    --marker '◈'
+    --prompt '◈ PKG › '
+    --header 'Tab: marcar · Alt-p: preview · Alt-b: PKGBUILD · Alt-i: info · Enter: instalar'
+    --preview "$preview_info_cmd"
+    --preview-window 'right:55%:border-left'
+    --border none
+    --color "$fzf_colors"
+    --bind 'alt-p:toggle-preview'
+    --bind 'alt-j:preview-down,alt-k:preview-up'
+    --bind "alt-b:change-preview($preview_pkgbuild_cmd)"
+    --bind "alt-i:change-preview($preview_info_cmd)"
+  )
+
+  raw_selection="$(get_available_packages | fzf "${fzf_opts[@]}")" || true
+
+  if [[ -z "$raw_selection" ]]; then
+    ui_info "Operación cancelada. No se seleccionaron paquetes."
+    exit 0
+  fi
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && selected_packages+=("$line")
+  done <<< "$raw_selection"
+fi
+
+if (( ${#selected_packages[@]} == 0 )); then
+  ui_info "No hay paquetes para instalar."
+  exit 0
+fi
+
+# ── clasificar paquetes en oficiales vs AUR ──────────────────────────────────
+official_pkgs=()
+aur_pkgs=()
+
+for item in "${selected_packages[@]}"; do
+  repo="${item%%/*}"
+  pkg_name="${item#*/}"
+
+  if [[ "$repo" == "aur" ]]; then
+    aur_pkgs+=("$pkg_name")
+  elif [[ "$item" == *"/"* ]]; then
+    official_pkgs+=("$pkg_name")
+  else
+    # Argumento sin prefijo repo/: consultar a pacman si existe en repo oficial
+    if pacman -Si "$item" >/dev/null 2>&1; then
+      official_pkgs+=("$item")
+    else
+      aur_pkgs+=("$item")
+    fi
+  fi
+done
+
+ui_banner "INSTALACIÓN DE PAQUETES" "Limitless OS Package Manager"
+
+install_error=0
+installed_any=0
+installed_summary=()
+
+# ── iniciar sudo keepalive para sesiones largas ──────────────────────────────
+sudo_keepalive_start || {
+  ui_fail "No se pudo obtener privilegios de sudo."
+  exit 1
+}
+
+# ── instalar paquetes oficiales ──────────────────────────────────────────────
+if (( ${#official_pkgs[@]} > 0 )); then
+  ui_info "Instalando paquetes oficiales con pacman: ${official_pkgs[*]}"
+  if sudo pacman -S --needed "${official_pkgs[@]}"; then
+    ui_ok "Paquetes oficiales instalados correctamente."
+    update_manifest "$REPO_DIR/packages/pacman.txt" "${official_pkgs[@]}"
+    installed_any=1
+    installed_summary+=("${official_pkgs[@]}")
+  else
+    ui_fail "Fallo al instalar paquetes oficiales."
+    install_error=1
+  fi
+fi
+
+# ── instalar paquetes AUR ────────────────────────────────────────────────────
+if (( ${#aur_pkgs[@]} > 0 )); then
+  aur_helper="$(detect_aur_helper)"
+  if [[ -z "$aur_helper" ]]; then
+    ui_fail "No se encontró un helper de AUR (yay o paru) para instalar: ${aur_pkgs[*]}"
+    install_error=1
+  else
+    ui_info "Instalando paquetes AUR con $aur_helper: ${aur_pkgs[*]}"
+    if "$aur_helper" -S --needed "${aur_pkgs[@]}"; then
+      ui_ok "Paquetes AUR instalados correctamente."
+      update_manifest "$REPO_DIR/packages/aur.txt" "${aur_pkgs[@]}"
+      installed_any=1
+      installed_summary+=("${aur_pkgs[@]}")
+    else
+      ui_fail "Fallo al instalar paquetes AUR."
+      install_error=1
+    fi
+  fi
+fi
+
+# ── notificación y resumen ───────────────────────────────────────────────────
+if (( installed_any == 1 )); then
+  if has_cmd notify-send; then
+    notify-send -a "Limitless OS" -i package-x-generic \
+      "Instalación completada" \
+      "Se instalaron: ${installed_summary[*]}" 2>/dev/null || true
+  fi
+  ui_info "Manifiestos actualizados en packages/. Puedes revisar y versionar los cambios."
+fi
+
+exit "$install_error"

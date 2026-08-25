@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# dot:summary=Busca y consulta información de paquetes oficiales y AUR
+# dot:group=sistema
+# dot:glyph=▣
+# dot:requires-sudo=false
+# dot:terminal=true
+#
+# Buscador interactivo de paquetes oficiales y AUR sin realizar instalación.
+# Permite explorar el repositorio, inspeccionar dependencias y auditar el
+# PKGBUILD antes de decidir instalar.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_banner() { echo "=== $1 ==="; }
+  ui_ok()     { echo "  [OK]  $1"; }
+  ui_fail()   { echo "  [ERR] $1"; }
+  ui_warn()   { echo "  [WARN] $1"; }
+  ui_info()   { echo "  [INFO] $1"; }
+fi
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+detect_aur_helper() {
+  if has_cmd yay; then
+    echo "yay"
+  elif has_cmd paru; then
+    echo "paru"
+  else
+    echo ""
+  fi
+}
+
+get_all_packages() {
+  # Repositorios oficiales: formato repo/paquete
+  pacman -Sl 2>/dev/null | awk '{print $1 "/" $2}'
+
+  # AUR: formato aur/paquete
+  local helper
+  helper="$(detect_aur_helper)"
+  if [[ -n "$helper" ]]; then
+    "$helper" -Slqa 2>/dev/null | awk '{print "aur/" $1}'
+  fi
+}
+
+# ── ayuda ─────────────────────────────────────────────────────────────────────
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  echo "uso: dotctl pkg search [término...]"
+  echo
+  echo "Busca y consulta información de paquetes oficiales y AUR."
+  echo "Si se especifica un término, abre el buscador pre-filtrado con la consulta."
+  echo
+  echo "Atajos en el buscador (fzf):"
+  echo "  Alt-p     Alternar vista previa"
+  echo "  Alt-b     Ver PKGBUILD (paquetes AUR)"
+  echo "  Alt-i     Ver información detallada del paquete"
+  echo "  Alt-j/k   Desplazar panel de vista previa"
+  echo "  Enter     Mostrar detalles completos del paquete"
+  echo "  Esc       Salir"
+  exit 0
+fi
+
+if ! has_cmd pacman; then
+  ui_fail "pacman no está disponible en este sistema."
+  exit 1
+fi
+
+if ! has_cmd fzf; then
+  # Fallback no interactivo si fzf no está instalado
+  if [[ $# -gt 0 ]]; then
+    query="$*"
+    ui_banner "BÚSQUEDA DE PAQUETES" "pacman / AUR"
+    echo "── Repositorios oficiales ──"
+    pacman -Ss "$query" 2>/dev/null || true
+    helper="$(detect_aur_helper)"
+    if [[ -n "$helper" ]]; then
+      echo "── Repositorio AUR ──"
+      "$helper" -Ssa "$query" 2>/dev/null || true
+    fi
+    exit 0
+  else
+    ui_fail "fzf no está instalado."
+    exit 1
+  fi
+fi
+
+preview_info_cmd='
+  target="{1}"
+  repo="${target%%/*}"
+  pkg="${target#*/}"
+  if [[ "$repo" == "aur" ]]; then
+    if command -v yay >/dev/null 2>&1; then
+      yay -Siia "$pkg" 2>/dev/null || yay -Sii "$pkg" 2>/dev/null
+    elif command -v paru >/dev/null 2>&1; then
+      paru -Siia "$pkg" 2>/dev/null || paru -Sii "$pkg" 2>/dev/null
+    else
+      echo "Detalles de AUR no disponibles (falta yay/paru)"
+    fi
+  else
+    pacman -Sii "$target" 2>/dev/null || pacman -Sii "$pkg" 2>/dev/null
+  fi
+'
+
+preview_pkgbuild_cmd='
+  target="{1}"
+  pkg="${target#*/}"
+  if command -v yay >/dev/null 2>&1; then
+    yay -Gpa "$pkg" 2>/dev/null || echo "No se pudo obtener PKGBUILD para $pkg"
+  elif command -v paru >/dev/null 2>&1; then
+    paru -Gp "$pkg" 2>/dev/null || echo "No se pudo obtener PKGBUILD para $pkg"
+  else
+    echo "yay o paru requerido para previsualizar PKGBUILD (alt-b)"
+  fi
+'
+
+fzf_colors="fg:#e5e9f0,fg+:#0ea5e9,bg:-1,bg+:#12141c,border:#94a3b824,pointer:#0ea5e9,marker:#6d28d9,prompt:#6d28d9,info:#64748b"
+
+fzf_opts=(
+  --pointer '❯'
+  --marker '◈'
+  --prompt '◈ SEARCH › '
+  --header 'Alt-p: preview · Alt-b: PKGBUILD · Alt-i: info · Enter: ver ficha completa'
+  --preview "$preview_info_cmd"
+  --preview-window 'right:55%:border-left'
+  --border none
+  --color "$fzf_colors"
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-j:preview-down,alt-k:preview-up'
+  --bind "alt-b:change-preview($preview_pkgbuild_cmd)"
+  --bind "alt-i:change-preview($preview_info_cmd)"
+)
+
+if [[ $# -gt 0 ]]; then
+  fzf_opts+=(--query "$*")
+fi
+
+selected="$(get_all_packages | fzf "${fzf_opts[@]}")" || true
+
+if [[ -n "$selected" ]]; then
+  repo="${selected%%/*}"
+  pkg="${selected#*/}"
+  echo
+  ui_banner "INFORMACIÓN DE PAQUETE" "$selected"
+  if [[ "$repo" == "aur" ]]; then
+    helper="$(detect_aur_helper)"
+    if [[ -n "$helper" ]]; then
+      "$helper" -Siia "$pkg" 2>/dev/null || "$helper" -Sii "$pkg" 2>/dev/null
+    else
+      echo "Detalles de AUR no disponibles (falta yay/paru)"
+    fi
+  else
+    pacman -Sii "$selected" 2>/dev/null || pacman -Sii "$pkg" 2>/dev/null
+  fi
+fi
