@@ -24,14 +24,33 @@ hyprlock
 hypridle
 hyprcursor
 hyprpicker
-swww
+# awww, NO swww: el proyecto se renombró (mismo autor, se movió de GitHub
+# a Codeberg) y el paquete `swww` YA NO EXISTE — ni en los repos oficiales
+# ni en AUR. `awww` lo declara con replaces/provides = swww, así que la
+# actualización es limpia, pero el nombre viejo en esta lista habría
+# hecho fallar `pacman -S`. Los binarios TAMBIÉN cambiaron de nombre:
+# son awww / awww-daemon (ver lua/exec.lua).
+awww
 grim
 slurp
 wf-recorder
 
-# ── login (§2, system/greetd/) ──────────────────────────────────────────────
-greetd
-greetd-tuigreet
+# ── login (§2, system/lightdm/) ─────────────────────────────────────────────
+# LightDM + tema propio en HTML/CSS/JS (backdrop-filter real, confirmado
+# sobre webkit2 — no sobre webkit1, que está deprecado). Sustituye a
+# greetd+tuigreet: greeter más maduro, y con cristal de verdad portable
+# desde el mockup en vez del límite de 16 colores ANSI de una TUI.
+lightdm
+lightdm-webkit2-greeter
+
+# ── sesión de emergencia (§2) — X11 a propósito, nunca puede competir con
+#    el stack Wayland de Hyprland. Conjunto mínimo, no xfce4-goodies ────────
+# OJO: `xfce4` es un GRUPO, no un paquete. Con --noconfirm pacman instala
+# todos sus miembros sin preguntar, que es justo lo que se quiere aquí
+# (una sesión de rescate completa), pero conviene saberlo: no es una sola
+# cosa, son ~15. Verificado contra archlinux.org/groups/x86_64/xfce4/.
+xfce4
+xfce4-terminal
 
 # ── terminal y shell (§3.2) ──────────────────────────────────────────────────
 ghostty
@@ -50,19 +69,33 @@ dust
 duf
 procs
 
+# ── shell de escritorio (§3.1, la pieza central del proyecto) ──────────────
+# Estaba en aur.txt; entró a los repos oficiales (extra). Instalarlo por
+# paru habría funcionado igual, pero compilando de más y sin firma del repo.
+quickshell
+
 # ── desarrollo (§3.3) ──────────────────────────────────────────────────────
 neovim
 lazygit
+lazydocker              # antes en AUR, ya en extra
 github-cli
 jq
 yq
 hyperfine
+xh                      # antes en AUR, ya en extra
 
 # ── sistema sin GUI (§3.4) ───────────────────────────────────────────────────
 btop
 nvtop
 yazi
 lnav
+# Las cuatro TUI de sistema pasaron de AUR a los repos oficiales. Se
+# verificó una por una contra la API de archlinux.org antes de moverlas:
+# dejarlas en aur.txt hacía que paru las compilara desde cero sin motivo.
+impala                  # Wi-Fi
+bluetui                 # Bluetooth
+wiremix                 # audio
+systemctl-tui           # servicios
 noto-fonts-cjk        # los kanji (蒼/赫/茈) del HUD y del greeter
 ttf-jetbrains-mono-nerd
 terminus-font          # fuente de la consola virtual, system/vconsole/README.md
@@ -73,11 +106,30 @@ mpv
 imv
 zathura
 zathura-pdf-mupdf
+rmpc                    # antes en AUR, ya en extra
 
 # ── utilidades de captura / portapapeles ────────────────────────────────────
 cliphist
 wl-clipboard
 satty
+brightnessctl           # teclas de brillo (spec-keybinds.md §4b) + dotctl osd bri
+playerctl               # teclas de medios vía MPRIS (spec-keybinds.md §3.3)
+libnotify               # notify-send: lo usan capture, theme, display, layout
+
+# ── puente herdr → HUD (LIMITLESS-OS.md §4.1, bin/cmd/herdr-bridge) ─────────
+# socat habla el socket UNIX de herdr; jq (ya arriba) parsea su JSON.
+socat
+
+# ── actualizaciones (bin/cmd/pkg outdated) ──────────────────────────────────
+pacman-contrib          # aporta `checkupdates`
+
+# ── grabación y compartir pantalla (§5, spec-keybinds.md) ───────────────────
+# Requiere, además: xdg-desktop-portal-hyprland (ya arriba) + pipewire +
+# wireplumber (ya arriba) para que el portal ScreenCast funcione con OBS y
+# con navegadores/Discord. Pendiente de Fase 1: exec-once = dbus-update-
+# activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP en
+# hyprland.lua — sin eso el portal no ve las variables de entorno correctas.
+obs-studio
 
 # ── herramientas de compilación (para paquetes AUR) ─────────────────────────
 base-devel

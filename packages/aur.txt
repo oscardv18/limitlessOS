@@ -5,40 +5,48 @@
 #
 # A diferencia de pacman.txt, un fallo aquí NO detiene el instalador: cada
 # paquete AUR es una compilación independiente, y una que falla no debe
-# tirar abajo las otras 20. 20-aur.sh continúa y reporta al final.
+# tirar abajo las otras.
+#
+# ── auditoría de nombres (hecha antes del despliegue) ──────────────────────
+# Cada entrada de este archivo se verificó contra la API real de AUR
+# (aur.archlinux.org/rpc/v5) Y contra la de los repos oficiales, porque el
+# error caro no es escribir mal un nombre — es dejar aquí algo que YA está
+# en los repos oficiales y hacer que paru lo compile desde cero sin motivo.
+#
+# Se movieron a pacman.txt por estar ya en `extra`: quickshell, lazydocker,
+# impala, bluetui, wiremix, systemctl-tui, xh, rmpc.
+# Se eliminaron por NO EXISTIR con ese nombre: hyprexpo, hyprbars (ver abajo).
 
 # ── shell (§3.2) — completan lo que fish traía de fábrica ──────────────────
 zsh-fast-syntax-highlighting
 fzf-tab
 
-# ── shell de escritorio (§3.1, la pieza central del proyecto) ───────────────
-quickshell
-
-# ── plugins de Hyprland (Fase 3, LIMITLESS-OS.md) ───────────────────────────
-# Version-sensibles: rompen en cada actualización de Hyprland. dotctl doctor
-# debe avisar si la versión instalada no coincide con la que se compiló.
-hyprexpo
-hyprbars
-
 # ── agentes / sesiones (§3.2, la integración más original del proyecto) ────
 herdr
-
-# ── contenedores (§3.3) ──────────────────────────────────────────────────────
-lazydocker
-
-# ── sistema sin GUI (§3.4) — TUI que Arch no empaqueta en extra ────────────
-impala
-bluetui
-wiremix
-systemctl-tui
 
 # ── datos y HTTP (§3.3) ──────────────────────────────────────────────────────
 posting
 lazysql
-xh
-
-# ── medios (§3.5) ────────────────────────────────────────────────────────────
-rmpc
 
 # ── theming ──────────────────────────────────────────────────────────────────
+# matugen-bin declara conflicts/provides = matugen: no instalar ambos.
 matugen-bin
+
+# ── plugins de Hyprland — NO son paquetes ───────────────────────────────────
+# `hyprexpo` y `hyprbars` estaban aquí y NINGUNO de los dos existe con ese
+# nombre, ni en AUR ni en los repos oficiales. Habrían hecho fallar la
+# etapa 20 en cada despliegue.
+#
+#   · hyprexpo  — es un plugin oficial del repo hyprland-plugins y se
+#     instala con `hyprpm add https://github.com/hyprwm/hyprland-plugins`
+#     + `hyprpm enable hyprexpo`. No hay paquete que instalar. Esto ya
+#     estaba dicho en stow/hypr/.config/hypr/lua/plugins.lua, pero la
+#     entrada equivocada seguía aquí.
+#   · hyprbars  — existe en AUR como `hyprland-plugin-hyprbars`, pero el
+#     proyecto lo DESCARTÓ a propósito (plan.md: "el semáforo de macOS no
+#     pertenece a este lenguaje visual"). No se reintroduce.
+#
+# Los plugins de hyprpm se recompilan contra CADA versión de Hyprland: si
+# el compositor se actualiza y el plugin no, Hyprland arranca sin él. Por
+# eso no van en una lista de paquetes — necesitan `hyprpm update` tras
+# cada actualización, y eso es trabajo de `dotctl update` (Fase 5).
