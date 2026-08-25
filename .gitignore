@@ -1,0 +1,9 @@
+# themes/matugen.toml lo GENERA bin/cmd/theme-export desde theme.toml en
+# cada corrida — es un artefacto de compilación, no algo que se edite a
+# mano. Versionarlo invita a que alguien lo edite directo y esos cambios
+# se pierdan en la siguiente ejecución de theme-export.
+themes/matugen.toml
+
+# archivos generados por matugen en la máquina real (colores de bat, etc.)
+# nunca deberían vivir en el repo — se regeneran con dotctl theme-export
+*.tmTheme.generated

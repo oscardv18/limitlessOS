@@ -1,0 +1,19 @@
+-- lua/plugins.lua — hyprexpo (Mission Control). Sin hyprbars: el
+-- semáforo de macOS no pertenece a este lenguaje visual (ya descartado
+-- en plan.md).
+--
+-- CORREGIDO tras verificar: los plugins NO se cargan desde hyprland.lua.
+-- Se gestionan con hyprpm (externo) — eso es tarea del instalador
+-- (packages/plugins.txt, pendiente, LIMITLESS-OS.md §7), no de este
+-- archivo. hl.plugin.* en Lua es solo para ACCEDER a un plugin ya
+-- cargado, no para cargarlo.
+--
+-- El bind que dispara la vista de hyprexpo va por hyprctl dispatch
+-- directo (no por hl.dsp, que no expone dispatchers de plugins de
+-- terceros de forma nativa) — es el mecanismo universal, funciona igual
+-- de bien para dispatchers propios que de plugin, y no depende de que
+-- el plugin exponga su propia tabla de Lua.
+--
+-- ATENCIÓN: SUPER+E no estaba en docs/spec-keybinds.md — es nuevo, hay
+-- que añadirlo allá para que quede como fuente de verdad, no solo aquí.
+hl.bind("SUPER + E", hl.dsp.exec_cmd("hyprctl dispatch hyprexpo:expo toggle"))

@@ -1,0 +1,113 @@
+# themes/hud-void/theme.toml — la única fuente de verdad de color.
+# docs/plan.md §5: paleta de identidad fija, NO derivada del wallpaper.
+# matugen usa este archivo como entrada para generar el theming de
+# aplicaciones de terceros — nunca al revés.
+#
+# Cada valor de aquí se extrajo de los cuatro consumidores YA construidos
+# y verificados (Neovim, Starship, tema de GRUB, tema de LightDM), no al
+# revés — este archivo no inventa color nuevo, lo consolida.
+#
+# ── una discrepancia real que se resolvió al escribir esto ──────────────
+# docs/mockups/limitless-shell.html (el mockup, referencia de DISEÑO) y
+# los cuatro consumidores YA CONSTRUIDOS (referencia de PRODUCCIÓN) no
+# coinciden en dos valores:
+#   --hollow      mockup #8b5cf6   ·  producción #a970ff
+#   --lapse-core  mockup #9bd4ff   ·  producción #8fe3ff
+# Ganó producción: los cuatro archivos que usan #a970ff/#8fe3ff son
+# exactamente el resultado de la intensificación de saturación que se
+# pidió explícitamente para Neovim (spec-colorscheme.md §2 — +40 puntos
+# de saturación sobre el violeta original). El mockup se quedó con la
+# paleta de antes de esa intensificación y nunca se refrescó. Pendiente,
+# anotado, no bloqueante: actualizar el mockup para que coincida.
+
+[meta]
+name             = "hud-void"
+technique_default = "lapse"   # 蒼 azul — la técnica activa al arrancar
+
+# ── superficies opacas — para consumidores sin compositor detrás
+#    (Neovim, terminal opaca, cualquier app que "cristal donde adorna,
+#    opacidad donde se lee" deja fuera del blur) ──────────────────────────
+[color.surface_opaque]
+void      = "#04060d"
+void_dim  = "#02040a"   # splits/paneles inactivos
+alt       = "#080d18"   # flotantes, sidebar, statusline
+hl        = "#0e1524"   # cursorline, resalte suave
+sel       = "#16233c"   # selección visual
+float     = "#070c17"   # popups, floating windows
+border    = "#1c2a40"
+indent    = "#101827"   # guía de indentación (indent-blankline) — casi invisible a propósito
+
+# ── superficies de cristal — para consumidores CON compositor detrás
+#    (QuickShell, LightDM, cualquier superficie con backdrop-filter/blur
+#    real). Mismos roles que arriba, expresados con alfa porque necesitan
+#    dejar pasar lo que hay detrás. ──────────────────────────────────────
+[color.surface_glass]
+surface     = "rgba(12,18,32,0.62)"
+surface_hi  = "rgba(16,24,42,0.80)"
+line        = "rgba(126,168,214,0.16)"
+line_hi     = "rgba(126,168,214,0.32)"
+
+# ── texto ────────────────────────────────────────────────────────────────
+[color.text]
+text     = "#eaf2ff"   # 17.98:1 sobre void — texto principal
+dim      = "#7e93b0"   #  6.45:1 — secundario, delimitadores
+comment  = "#6b7f9e"   #  4.97:1 — comentarios (ODP los deja en ~3:1, aquí AA)
+mute     = "#46587a"   # gutter, ruido de fondo, línea de tiempo
+ghost    = "#2a3a55"   # inlay hints, whitespace invisible
+
+# ── las tres técnicas — coexisten, la activa la decide [meta].
+#    technique_default o el toggle en caliente (SUPER+T) ─────────────────
+[color.technique.lapse]        # 蒼 azul — atracción
+accent      = "#3b9eff"        # 7.25:1
+accent_core = "#8fe3ff"        # 14.08:1 — el valor de producción, no el del mockup
+
+[color.technique.hollow]       # 茈 morado hueco — la técnica activa por defecto en Neovim/Starship
+accent      = "#a970ff"        # 6.22:1 — el valor de producción, no el del mockup
+accent_core = "#e9d5ff"        # coincide en mockup y LightDM, sin conflicto
+
+[color.technique.reversal]     # 赫 rojo invertido
+accent      = "#ff4a2e"        # 6.05:1
+accent_core = "#ffb4a0"        # solo en el mockup hasta ahora; sin conflicto, se adopta
+
+# ── roles de sintaxis — compartidos por Neovim/Starship, con contraste
+#    ya medido en spec-colorscheme.md §3 ──────────────────────────────────
+[color.syntax]
+cyan    = "#2ee6d6"   # 12.93:1 — operadores
+green   = "#4bf0a5"   # 13.80:1 — cadenas, éxito
+amber   = "#ffd25e"   # 14.11:1 — tipos, avisos
+orange  = "#ff9d3d"   #  9.78:1 — números, constantes
+magenta = "#ff5ecb"   #  7.44:1 — macros
+coral   = "#ff6b7f"   #  7.39:1 — variables, parámetros
+
+# ── estados de diagnóstico/diff — hoy solo en Neovim; se documentan
+#    aquí porque cualquier plantilla nueva (lazygit, delta) los necesita
+#    igual y no deben reinventarse ────────────────────────────────────────
+# ── el iris — constante, no cambia con la técnica activa (mockup:
+#    --six-eyes, "el iris"). Añadida en la Fase 4 (cimiento de QuickShell,
+#    el aro de dispersión cromática de GlassSurface.qml la necesita) —
+#    ningún consumidor de la Fase 1 (Neovim/Starship/GRUB/LightDM) la usaba,
+#    así que no estaba: esto extiende la verificación de completitud de
+#    entonces, no la contradice.
+[color.constant]
+six_eyes = "#b8ecff"
+
+[color.state]
+add     = "#1d5f42"
+change  = "#1d3f6b"
+delete  = "#5f1f18"
+diff_text = "#2a5a91"
+diag_error_bg = "#1a0a08"
+diag_warn_bg  = "#1a1508"
+diag_info_bg  = "#08111f"
+diag_hint_bg  = "#071a19"
+
+[font]
+family = "JetBrains Mono"
+jp     = "Noto Serif JP"     # kanji de las técnicas — el greeter y el VT
+                              # no lo rasterizan, ver system/vconsole/README.md
+
+[geometry]
+bar_height   = 26
+radius_dock  = 14
+radius_icon  = 12
+tracking     = 0.04           # letter-spacing en em, uniforme en toda la UI
