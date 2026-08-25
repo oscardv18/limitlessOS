@@ -85,26 +85,19 @@ Si eso arranca, el problema está en tu configuración. Si no arranca, es el sis
 
 ## 2. Cómo se entra a Limitless
 
-Sin DE, el arranque de sesión hay que decidirlo. Tres opciones:
+> **Decisión revisada — supera a las tres opciones (autologin / greetd+tuigreet / SDDM) que este documento barajaba antes.** El motivo del cambio: se probó la ruta de "sin entorno gráfico en absoluto" en la máquina real y falló — Plymouth se colgó en el traspaso de pantalla y no hubo forma de caer a nada gráfico, solo TTY a mano. La arquitectura actual añade una red de seguridad *gráfica* real, no solo una consola de rescate.
 
-| | Ruta | Pro | Contra |
-|---|---|---|---|
-| A ✅ | **Autologin en TTY1 → uwsm lanza Hyprland → hyprlock bloquea al instante** | **La pantalla de login que ya diseñaste ES tu login.** Cero componentes extra, coherencia total | Requiere cifrado de disco para ser seguro |
-| B | `greetd` + `tuigreet` | Greeter TUI, ligero, correcto | Es una pantalla fea antes de tu pantalla bonita. Duplica el concepto de login |
-| C | SDDM | Familiar | Arrastra Qt y un tema más que mantener, para una pantalla que ves 3 segundos |
+**LightDM, con dos sesiones a elegir en cada arranque: Hyprland Limitless (a diario) o XFCE (emergencia).** Ambas cuelgan del mismo gestor de pantalla, así que no hay dos sistemas de login que mantener — solo una pantalla, un tema, dos opciones.
 
-**Recomiendo A si el disco está cifrado con LUKS.** Con cifrado, la puerta real es la contraseña del arranque: el autologin posterior no debilita nada y hyprlock protege la sesión en caliente.
+| Pieza | Elección | Por qué |
+|---|---|---|
+| Gestor de pantalla | **LightDM** | Maduro, probado durante años, no se cuelga en silencio como puede hacerlo un greeter TUI más joven. Es además lo que trae por defecto el perfil XFCE de CachyOS — cero fricción |
+| Tema del greeter | **`lightdm-webkit2-greeter`** | HTML/CSS/JS real, con `backdrop-filter` funcional (confirmado: la versión *webkit1*, deprecada, no lo soporta; *webkit2* sí). El cristal, el campo de colisión y la paleta se portan del mockup casi sin reescribir — a diferencia de `tuigreet`, que solo aceptaba 16 colores ANSI |
+| Sesión a diario | **Hyprland Limitless** | El sistema completo que describe este documento |
+| Sesión de emergencia | **XFCE** | X11, no Wayland — por diseño no puede competir ni chocar con el stack de Hyprland. Es un "romper cristal en caso de emergencia", no un segundo hogar |
+| Splash de arranque | **Ninguno — Plymouth se desinstala** (`00-preflight.sh`, ya construido) | Causa documentada y recurrente de cuelgues de arranque en CachyOS, con o sin greeter TUI de por medio. Puramente cosmético; se pierde solo la animación |
 
-**Si el disco NO está cifrado** —y con CachyOS ya instalado, eso está decidido— hay que elegir a conciencia:
-
-| Situación | Recomendación |
-|---|---|
-| Sobremesa, en casa, nadie más accede | **A igualmente.** El riesgo es físico y lo asumes conscientemente. Ganas tu pantalla de login diseñada |
-| Portátil, o el equipo sale de casa | **B: `greetd` + `tuigreet`.** Sin cifrado, el autologin convierte el robo del equipo en robo de datos |
-
-Con B no pierdes la pantalla que diseñaste: `tuigreet` es solo el portero, y hyprlock sigue siendo lo que ves al bloquear y reanudar, que es el 95% de las veces que la miras.
-
-Verifica el cifrado con `lsblk -f` — si aparece `crypto_LUKS`, estás cubierto.
+No hace falta decidir entre cifrado sí/no para esta arquitectura: LightDM siempre pide credenciales, así que no hay una puerta "más débil" que proteger con autologin.
 
 ---
 
@@ -123,7 +116,7 @@ La regla que lo unifica: **si existe una TUI decente, la TUI gana.** No por est�
 | Audio | `pipewire`, `wireplumber`, `pipewire-pulse` | |
 | Red | `networkmanager` | |
 | Bloqueo / idle | `hyprlock`, `hypridle` | Es tu pantalla de login (§2) |
-| Fondo | `swww` | Hasta que el campo de colisión viva en Quickshell |
+| Fondo | `awww` (era `swww`, renombrado upstream) | Solo respaldo: el campo de colisión ya vive en QuickShell (`modules/Wallpaper.qml`) |
 | Shell | `quickshell` | Barra, dock, launcher, paneles |
 | Cursores | `hyprcursor` + tema | |
 
@@ -204,14 +197,19 @@ Instalar 40 paquetes no es un sistema operativo. Estas cinco integraciones sí:
 
 ### 4.1 herdr → HUD *(la mejor idea de este documento)*
 
-herdr detecta cuatro estados por agente: **bloqueado, trabajando, hecho, inactivo**. Y tu paleta tiene exactamente cuatro registros:
+herdr detecta estados por agente, y tu paleta tiene un registro para cada uno:
 
 | Estado herdr | Color Limitless | Lectura |
 |---|---|---|
-| Bloqueado — te necesita | `#ff4a2e` 赫 | Reversión: algo te espera |
-| Trabajando | `#ffd25e` ámbar | En curso |
-| Hecho | `#3b9eff` 蒼 | Atracción: listo para revisar |
-| Inactivo | `#6b7f9e` atenuado | Ruido de fondo |
+| `blocked` — te necesita | `#ff4a2e` 赫 | Reversión: algo te espera |
+| `working` | `#ffd25e` ámbar | En curso |
+| `done` | `#3b9eff` 蒼 | Atracción: listo para revisar |
+| `idle` | `#6b7f9e` atenuado | Ruido de fondo |
+| `unknown` | `#6b7f9e` atenuado | Ver nota |
+
+> **Corrección sobre esta misma tabla.** Esta sección decía "cuatro estados" y los daba por buenos sin haberlos verificado. Al construir el puente (`bin/cmd/herdr-bridge`) se comprobó la API real (`herdr.dev/docs/socket-api/`): los estados son **cinco**, no cuatro — el quinto es `unknown`, para paneles que el detector no supo clasificar. Se colapsa sobre `idle` (mismo color) porque un estado que herdr no reconoce no merece reclamar tu atención; pero existe, y quien lea esta tabla debe saberlo en vez de encontrárselo.
+
+**Cómo está construido:** `bin/cmd/herdr-bridge` sondea el socket UNIX de herdr (`agent.list`, JSON delimitado por saltos de línea) cada 2 s y publica el conteo por IPC a QuickShell; `modules/Bar.qml` pinta un punto por agente con el color de su estado. Lo lanza `lua/exec.lua` al arrancar la sesión. Si herdr no está instalado, el puente publica ceros y la barra simplemente no dibuja el grupo de puntos.
 
 **La integración:** un puente lee el estado de herdr y lo publica por IPC a Quickshell. La barra muestra un grupo de puntos —uno por agente— con su color. Un agente que se bloquea **enciende un punto rojo en la barra aunque el terminal esté en otro workspace**, y dispara una notificación con el material de cristal.
 
@@ -270,38 +268,46 @@ Cinco pasos, todos escribibles a mano. Sin `curl | bash`: el repo se clona **ant
 
 | Etapa | Qué hace |
 |---|---|
-| `00-preflight` | Verifica arquitectura, red, espacio y que no seas root. **Instala y activa `snapper`+`snap-pac`+`grub-btrfs` si la raíz es Btrfs**, y crea la primera instantánea antes de tocar nada |
-| `10-core` | Paquetes oficiales desde `packages/pacman.txt` |
-| `20-aur` | Instala `paru` si falta, luego `packages/aur.txt` |
-| `30-services` | Habilita pipewire, NetworkManager, bluetooth, seatd |
+| `00-preflight` | Verifica arquitectura, red, espacio y que no seas root. **Instala y activa `snapper`+`snap-pac`+`grub-btrfs` si la raíz es Btrfs**, crea la primera instantánea, y **desinstala Plymouth** (ya construido — causa documentada de cuelgues) |
+| `10-core` | Paquetes oficiales desde `packages/pacman.txt`, sobre pacman puro — funciona igual en CachyOS que en cualquier Arch |
+| `20-aur` | Instala `paru` si falta, luego `packages/aur.txt`. Fallos individuales no frenan la etapa |
+| `30-services` | Habilita pipewire, wireplumber, NetworkManager, bluetooth, seatd |
 | `40-stow` | Enlaza las configuraciones |
 | `50-theme` | matugen genera los temas de las ~14 aplicaciones |
-| `60-session` | Autologin + uwsm + hyprlock (§2) |
+| `60-session` | **LightDM + `lightdm-webkit2-greeter`** (tema propio) + sesiones Hyprland/XFCE + hyprlock/hypridle (§2) — sustituye a la etapa anterior de `greetd`/autologin |
 | `70-shell` | zsh por defecto, plugins, starship, zoxide, fzf-tab |
 | `80-tui` | Entradas `.desktop` de las TUI (§4.2) |
 | `90-verify` | `dotctl doctor` y resumen |
 
-Reglas para todas: **idempotentes** (ejecutar dos veces no rompe nada), **marcadas** en `~/.local/state/limitless/stages/`, y **reanudables** con `./install.sh --from=50`. Si la etapa 20 falla compilando un paquete AUR a las dos horas, no repites desde cero.
+Reglas para todas: **idempotentes** (ejecutar dos veces no rompe nada), **marcadas** en `~/.local/state/limitless/stages/`, y **reanudables** con `./install.sh --from=50`. Si la etapa 20 falla compilando un paquete AUR a las dos horas, no repites desde cero. **Ninguna etapa se ejecuta durante la construcción** — el instalador entero corre una sola vez, en la Fase de Despliegue (§6).
 
 ### 5.3 Orden que importa
 
-`30-services` va **antes** que `60-session`: si el autologin arranca Hyprland sin pipewire ni polkit habilitados, entras a una sesión rota y sin GUI para arreglarla. Y `90-verify` termina diciéndote explícitamente si es seguro reiniciar.
+`00-preflight` (sudo, red de seguridad) va antes que todo. `10-core` (paquetes oficiales) va antes que `20-aur`, porque `paru` necesita `base-devel`/`git` ya instalados para poder compilar. `30-services` va **antes** que `60-session`: si LightDM arranca una sesión sin pipewire ni polkit habilitados, entras a una sesión rota. Y `90-verify` termina diciéndote explícitamente si es seguro reiniciar.
 
 ---
 
 ## 6. Fases de construcción
 
+> **Cambio de arquitectura, decidido en esta revisión.** Las fases anteriores mezclaban "escribir código" con "ejecutarlo sobre una máquina real" — Fase 0 literalmente pedía correr `install.sh` antes de que el sistema estuviera terminado. Eso ya no es así.
+>
+> **Todas las fases de construcción son trabajo en el repositorio: código, configuración, documentación — nunca instalación sobre una máquina real.** `install.sh` no se ejecuta en ninguna fase de construcción. Se ejecuta **una sola vez**, al final de todo, en la **Fase de Despliegue**, y solo cuando tú lo pidas explícitamente sobre un sistema operativo ya instalado. Ningún agente —yo, u otro trabajando en paralelo— debe ejecutarlo antes de eso. Está escrito así, en mayúsculas de intención, en `CLAUDE.md`.
+>
+> El "terminas cuando" de cada fase ya no es "arranca en mi hardware": es que el código exista, esté verificado por los medios que sí están disponibles sin una máquina real —sintaxis validada, mockup consultado y consistente, `bash -n`/`qmllint` en verde, revisión cruzada— y quede documentado.
+
+**Arquitectura de sesión, ya decidida** (sustituye a `greetd`+`tuigreet` de revisiones anteriores): **GRUB → Plymouth desactivado (causa conocida de cuelgues en CachyOS, `install/stages/00-preflight.sh`) → LightDM → elección de sesión: Hyprland Limitless (a diario) o XFCE (emergencia) → CachyOS/Arch base.** El tema de LightDM se construye sobre `lightdm-webkit2-greeter` (HTML/CSS/JS real, con `backdrop-filter` funcional — a diferencia de `tuigreet`, aquí sí se porta el cristal de verdad desde el mockup).
+
 | Fase | Contenido | Terminas cuando |
 |---|---|---|
-| **0 · Terreno** | Auditar lo ya instalado. Activar instantáneas en GRUB. Repo, `install.sh` con etapas vacías, `dev/minimal.conf`, rescate en el README | Ves el submenú de instantáneas en GRUB **y** arrancas `Hyprland -c dev/minimal.conf` desde TTY |
-| **1 · Núcleo** | `hyprland.lua` modular, cristal, workspaces semánticos, scratchpads, **`theme.toml` + matugen operativos** | Sesión completa por teclado, con un solo tema gobernando todo |
-| **2 · Habitable** | Ghostty, zsh + 3 plugins, starship, neovim, yazi, btop, lazygit, herdr, impala, bluetui, portapapeles, capturas | **Trabajas el día entero aquí.** Hito crítico |
-| **3 · Sesión** | greetd + tuigreet + paleta del VT, hyprlock, hypridle, notificaciones, OSD, uwsm | Entras desde el greeter, bloqueas, reanudas y el sistema te avisa |
-| **4 · Shell** | Quickshell en el orden de `plan.md` §7: cromo → campo → barra → dock → launcher → notificaciones → OSD | Un solo motor de shell, con el material de `plan.md` §3.6 |
-| **5 · Ecosistema** | **Puente herdr→HUD**, sesiones de proyecto, paneles de control y paquetes, `dotctl` completo, migraciones | El sistema se comporta como un producto |
+| **1 · Núcleo** | `hyprland.lua` modular (sintaxis Lua de 0.55+/0.56 verificada línea a línea contra el wiki en vivo — nunca de memoria), cristal, workspaces semánticos, scratchpads, `theme.toml` + plantillas de matugen | El archivo existe, sintaxis Lua verificada, y `theme.toml` gobierna al menos Neovim + Starship + GRUB sin un solo hex fuera de `themes/` |
+| **2 · Ecosistema de terminal** | zsh + 3 plugins, Ghostty, Neovim, Starship — ya escritos — más yazi, btop, lazygit, lazydocker, herdr, impala, bluetui, portapapeles, capturas, **12 plantillas de tema restantes** | Cada pieza tiene su plantilla de tema y su entrada en `packages/`; `dotctl doctor` los reconoce todos |
+| **3 · Sesión** | LightDM + tema `lightdm-webkit2-greeter` (adaptado del mockup), XFCE como sesión de emergencia, hyprlock, hypridle, notificaciones, OSD, Plymouth fuera (`00-preflight.sh`, ya construido) | El tema del greeter existe como HTML/CSS/JS real, verificado en navegador igual que el mockup del shell |
+| **4 · Shell** | QuickShell en el orden de `plan.md` §7: cromo → campo → barra → dock → launcher → notificaciones → OSD | Cada componente QML existe, pasa `qmllint`, y coincide con el mockup |
+| **5 · Ecosistema propio** | Puente herdr→HUD, sesiones de proyecto, paneles de control y paquetes, `dotctl` completo, migraciones, **atajos de teclado completos** (`spec-keybinds.md`, incluidas teclas multimedia/función de portátil), **OBS Studio + captura de pantalla** (portal PipeWire, Discord en Wayland nativo) | Todo escrito y verificable: `hl.bind()` para cada atajo, `obs-studio` en `packages/`, la configuración del portal documentada y lista para aplicarse |
 | **6 · Pulido** | Gestos, degradación por batería, spike del shader, CI de lint, README con capturas | Repo publicable |
+| **Despliegue** *(única fase que toca una máquina real)* | Instalar CachyOS/Arch limpio → `./install.sh` una vez, completo → verificar contra `docs/runbook-despliegue.md` | El sistema arranca, se ve como el mockup, y `dotctl doctor` no reporta fallos |
 
-**La Fase 2 vuelve a ser el hito.** Sin DE de respaldo tienes aún más razón para llegar rápido a un sistema usable: mientras no lo sea, tu ordenador no lo es.
+**Portabilidad, como requisito explícito de ahora en adelante:** el instalador debe funcionar sobre **CachyOS o cualquier distribución basada en Arch**, no solo CachyOS. La mayoría del repo ya lo cumple por construcción — Btrfs/snapper/grub-btrfs es tooling genérico de Arch, no exclusivo de CachyOS, y la única pieza específica de CachyOS (`cachyos-plymouth-bootanimation`, `cachyos-plymouth-theme` en `00-preflight.sh`) ya está protegida con `pacman -Qq` — se salta sola si esos paquetes no existen, sin fallar. Cualquier pieza nueva que se añada de aquí en adelante debe seguir ese mismo patrón: verificar existencia antes de asumir.
 
 ---
 

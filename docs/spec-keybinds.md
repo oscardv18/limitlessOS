@@ -62,6 +62,7 @@ El mockup, por necesidad de probarse en un navegador sin `SUPER`, usa teclas sue
 | `TAB` | Ciclar foco entre ventanas | `Tab` — ver §2, aquí SÍ hace falta el modificador |
 | `1`–`9` | Cambiar de workspace | `1`–`5` — ver §2 |
 | `LEFT` / `RIGHT` | Paneo de la cinta, solo cuando el layout activo es `scroll` | `←` / `→` |
+| `E` | Mission Control (`hyprexpo`) — rejilla de todos los workspaces | *nuevo, sin equivalente en el mockup* |
 
 ### 3.2 Gestión de ventanas (heredado de `dev/minimal.conf`, con un cambio)
 
@@ -100,10 +101,45 @@ Cuatro teclas del mockup existen solo para poder demostrar un estado sin esperar
 
 | Tecla del mockup | Qué demuestra | Cómo se dispara de verdad |
 |---|---|---|
-| `G` | Vista previa del greeter | `greetd` lo muestra antes de iniciar sesión — nunca se invoca a mano |
+| `G` | Vista previa del greeter | LightDM lo muestra antes de iniciar sesión — nunca se invoca a mano |
 | `S` | Disparo inmediato del salvapantallas | `hypridle`, tras 25 s de inactividad |
 | `N` | Notificación de prueba | El propio sistema, cuando pasa algo real |
 | `+` / `-` | Añadir/quitar ventanas falsas del layout | No existe equivalente: las ventanas aparecen al abrir apps, no con un atajo |
+
+---
+
+## 4b. Teclas de función del portátil
+
+Sin `SUPER`: son teclas físicas dedicadas (brillo, volumen, avión…), no combinaciones que tú eliges — el estándar es enlazarlas directo, sin modificador, exactamente como llegan del hardware. Nombres verificados contra `XF86keysym.h` (el estándar de facto en X11/Wayland desde hace más de veinte años; Hyprland los reconoce igual que cualquier compositor) — nada de esta tabla es una suposición.
+
+| Tecla física | Keysym | Acción | Nota |
+|---|---|---|---|
+| Brillo ↑ | `XF86MonBrightnessUp` | Subir brillo de pantalla | `brightnessctl set +5%` o equivalente |
+| Brillo ↓ | `XF86MonBrightnessDown` | Bajar brillo de pantalla | |
+| Silenciar | `XF86AudioMute` | Mute/unmute | `wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle` |
+| Volumen ↓ | `XF86AudioLowerVolume` | Bajar volumen | Alimenta el OSD del mockup (§3.1 de `plan.md`) |
+| Volumen ↑ | `XF86AudioRaiseVolume` | Subir volumen | |
+| Pista anterior | `XF86AudioPrev` | Anterior | Vía MPRIS — el mismo bus que ya usa el reproductor del panel de widgets |
+| Pista siguiente | `XF86AudioNext` | Siguiente | |
+| Reproducir/pausa | `XF86AudioPlay` | Play/Pause | Toggle; algunos teclados envían `XF86AudioPause` por separado — enlazar ambos al mismo toggle no hace daño |
+| Pantalla externa / proyector | `XF86Display` | Ciclar disposición de monitores | Confirmado: en ThinkPad es `Fn+F7`, en HP `Fn+F4` — la tecla física varía, el keysym no. Dispara un script propio (`dotctl display cycle`, pendiente de escribir) que rota interno-only → espejo → extender → externo-only |
+| Modo avión | `XF86RFKill` | Alternar todo el radio (Wi-Fi + Bluetooth) | `rfkill toggle all`. En hardware ASUS el driver a veces mapea esta tecla como `XF86WLAN` en vez de `XF86RFKill` — si no responde, comprobar con `wev` cuál de las dos llega realmente |
+| Captura de pantalla | `Print` | Región a portapapeles | No lleva prefijo `XF86` — es el `Print`/`Sys_Req` estándar de X11, no una tecla de función especial. Coincide con `SUPER+SHIFT+S` de la tabla §3.1: mismo comando, dos formas de llegar a él |
+
+Verificación en la máquina real, antes de dar esto por bueno: `wev` (Wayland) muestra el keysym exacto que envía cada tecla física — hardware distinto puede mapear de forma distinta, sobre todo en el par avión/RFKill.
+
+## 4c. OBS Studio y compartir pantalla (Discord y similares)
+
+Verificado contra la documentación de `xdg-desktop-portal-hyprland` y reportes reales de la comunidad — el mecanismo es PipeWire + el portal `ScreenCast`, no una integración especial por aplicación:
+
+- **Requisito de base, ya en `packages/pacman.txt`:** `pipewire`, `wireplumber`, `xdg-desktop-portal-hyprland`, `xdg-desktop-portal-gtk`, `obs-studio` (confirmado en el repo `extra` oficial de Arch, sin AUR).
+- **Falta en `hyprland.lua` (Fase 1):** `exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP` — sin esto el portal no ve las variables de entorno correctas y OBS/Discord no encuentran ninguna fuente que compartir.
+- **OBS** funciona directo una vez el portal está sano: fuente "Captura de pantalla (PipeWire)", aparece un selector nativo preguntando qué compartir.
+- **Discord y cualquier app basada en Electron** corren bajo XWayland por defecto, y XWayland **no puede** capturar ventanas ni pantallas Wayland — solo otras ventanas XWayland. Hace falta forzar Wayland nativo en el lanzador de la app:
+  ```
+  discord --enable-features=UseOzonePlatform,WebRTCPipeWireCapturer --ozone-platform=wayland
+  ```
+  Pendiente: envolver esto en el `.desktop` de Discord (`dotctl tui-install`-style, o una entrada manual en `stow/`) para que no haya que recordarlo cada vez.
 
 ---
 
