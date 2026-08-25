@@ -1,0 +1,64 @@
+# themes/_templates/btop.tmpl — plantilla de matugen para btop.
+# Destino real: ~/.config/btop/themes/limitless.theme (activado por
+# `color_theme = "limitless"` en stow/btop/.config/btop/btop.conf).
+# Formato verificado contra themes/dracula.theme del propio repo de btop
+# (aristocratos/btop, github raw) — no es un formato inventado.
+# Criterio de mapeo: mismos roles que stow/nvim/.config/nvim/colors/limitless.lua
+# (blue=atracción/función, violet=palabra clave, red=error, green=éxito).
+#
+# main_bg vacío a propósito — btop corre en un scratchpad flotante glass
+# (SUPER+SHIFT+B, spec-layouts.md), y el cristal lo pone el terminal, no
+# la app (regla del proyecto: "cristal donde adorna, opacidad donde se lee").
+
+theme[main_bg]=""
+theme[main_fg]="{{custom.text_text.hex}}"
+theme[title]="{{custom.text_text.hex}}"
+theme[hi_fg]="{{custom.technique_lapse_accent.hex}}"
+theme[selected_bg]="{{custom.surface_opaque_sel.hex}}"
+theme[selected_fg]="{{custom.text_text.hex}}"
+theme[inactive_fg]="{{custom.text_mute.hex}}"
+theme[graph_text]="{{custom.text_dim.hex}}"
+theme[meter_bg]="{{custom.surface_opaque_hl.hex}}"
+theme[proc_misc]="{{custom.technique_hollow_accent.hex}}"
+
+theme[cpu_box]="{{custom.technique_lapse_accent.hex}}"
+theme[mem_box]="{{custom.syntax_green.hex}}"
+theme[net_box]="{{custom.technique_reversal_accent.hex}}"
+theme[proc_box]="{{custom.syntax_cyan.hex}}"
+theme[div_line]="{{custom.surface_opaque_border.hex}}"
+
+theme[temp_start]="{{custom.technique_lapse_accent.hex}}"
+theme[temp_mid]="{{custom.syntax_amber.hex}}"
+theme[temp_end]="{{custom.technique_reversal_accent.hex}}"
+
+theme[cpu_start]="{{custom.technique_lapse_accent.hex}}"
+theme[cpu_mid]="{{custom.syntax_cyan.hex}}"
+theme[cpu_end]="{{custom.syntax_green.hex}}"
+
+theme[free_start]="{{custom.technique_hollow_accent.hex}}"
+theme[free_mid]="{{custom.syntax_magenta.hex}}"
+theme[free_end]="{{custom.technique_reversal_accent.hex}}"
+
+theme[cached_start]="{{custom.syntax_cyan.hex}}"
+theme[cached_mid]="{{custom.technique_lapse_accent.hex}}"
+theme[cached_end]="{{custom.technique_lapse_accent_core.hex}}"
+
+theme[available_start]="{{custom.syntax_amber.hex}}"
+theme[available_mid]="{{custom.syntax_orange.hex}}"
+theme[available_end]="{{custom.technique_reversal_accent.hex}}"
+
+theme[used_start]="{{custom.syntax_green.hex}}"
+theme[used_mid]="{{custom.syntax_cyan.hex}}"
+theme[used_end]="{{custom.technique_lapse_accent.hex}}"
+
+theme[download_start]="{{custom.technique_lapse_accent.hex}}"
+theme[download_mid]="{{custom.syntax_cyan.hex}}"
+theme[download_end]="{{custom.syntax_green.hex}}"
+
+theme[upload_start]="{{custom.technique_hollow_accent.hex}}"
+theme[upload_mid]="{{custom.syntax_magenta.hex}}"
+theme[upload_end]="{{custom.technique_reversal_accent.hex}}"
+
+theme[process_start]="{{custom.syntax_green.hex}}"
+theme[process_mid]="{{custom.syntax_cyan.hex}}"
+theme[process_end]="{{custom.technique_lapse_accent.hex}}"

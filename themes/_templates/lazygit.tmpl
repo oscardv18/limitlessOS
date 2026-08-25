@@ -1,0 +1,36 @@
+# themes/_templates/lazygit.tmpl — plantilla de matugen para lazygit.
+# Destino real: ~/.config/lazygit/config.yml (bajo gui.theme — lazygit
+# fusiona esto con su config por defecto, no hace falta repetir el resto
+# de claves). Formato YAML verificado contra
+# github.com/jesseduffield/lazygit/blob/master/docs/Config.md — cada
+# color de gui.theme es una LISTA (colores + atributos como "bold"),
+# nunca un escalar suelto.
+
+gui:
+  theme:
+    activeBorderColor:
+      - "{{custom.technique_lapse_accent.hex}}"
+      - bold
+    inactiveBorderColor:
+      - "{{custom.surface_opaque_border.hex}}"
+    searchingActiveBorderColor:
+      - "{{custom.technique_hollow_accent.hex}}"
+      - bold
+    optionsTextColor:
+      - "{{custom.technique_lapse_accent.hex}}"
+    selectedLineBgColor:
+      - "{{custom.surface_opaque_sel.hex}}"
+    inactiveViewSelectedLineBgColor:
+      - "{{custom.surface_opaque_hl.hex}}"
+    cherryPickedCommitFgColor:
+      - "{{custom.technique_lapse_accent.hex}}"
+    cherryPickedCommitBgColor:
+      - "{{custom.surface_opaque_sel.hex}}"
+    markedBaseCommitFgColor:
+      - "{{custom.technique_hollow_accent.hex}}"
+    markedBaseCommitBgColor:
+      - "{{custom.surface_opaque_sel.hex}}"
+    unstagedChangesColor:
+      - "{{custom.technique_reversal_accent.hex}}"
+    defaultFgColor:
+      - "{{custom.text_text.hex}}"

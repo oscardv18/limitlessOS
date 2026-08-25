@@ -1,16 +1,17 @@
 # 60-fzf.zsh — fzf es el motor detrás del completado (fzf-tab), Ctrl+R,
 # Ctrl+T y del panel de paquetes (spec-package-panel.md). Un solo bloque de
 # color para los cuatro. A diferencia de tuigreet, fzf SÍ acepta hex directo.
-
-export FZF_DEFAULT_OPTS="
-  --height=52% --layout=reverse --border=rounded --info=inline
-  --color=fg:#7e93b0,fg+:#eaf2ff,bg:-1,bg+:#0e1524
-  --color=hl:#3b9eff,hl+:#8fe3ff
-  --color=border:#1c2a40,header:#a970ff,gutter:-1
-  --color=pointer:#3b9eff,marker:#a970ff,spinner:#2ee6d6
-  --color=prompt:#a970ff,info:#46587a
-  --pointer=❯ --marker=◈ --prompt='◈ ❯ '
-"
+#
+# El color ya no vive aquí a mano — lo genera matugen desde theme.toml
+# (themes/_templates/fzf.tmpl, vía bin/cmd/theme-export + 50-theme.sh).
+# Si el archivo generado todavía no existe (primer arranque antes del
+# instalador, o clon nuevo sin desplegar), cae a un valor de emergencia
+# para que abrir una terminal no se rompa.
+if [[ -f "$ZDOTDIR/fzf-colors.zsh" ]]; then
+  source "$ZDOTDIR/fzf-colors.zsh"
+else
+  export FZF_DEFAULT_OPTS="--height=52% --layout=reverse --border=rounded --info=inline"
+fi
 
 # el paquete `fzf` de Arch instala los scripts de integración aquí
 if [[ -f /usr/share/fzf/completion.zsh ]]; then

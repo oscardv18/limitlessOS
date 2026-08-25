@@ -1,0 +1,86 @@
+/*
+ * themes/_templates/gtk.tmpl — plantilla de matugen para GTK 3 y GTK 4.
+ * Destino real: ~/.config/gtk-3.0/gtk.css  y  ~/.config/gtk-4.0/gtk.css
+ * (el mismo archivo sirve para ambos — matugen lo escribe dos veces,
+ * ver los dos bloques [templates.gtk3] / [templates.gtk4] que
+ * bin/cmd/theme-export genera).
+ *
+ * @define-color es la directiva de color de GTK: define un nombre
+ * reutilizable que los widgets del tema base consultan. Redefinir los
+ * nombres estándar de Adwaita reviste el tema del sistema sin escribir
+ * un tema GTK entero desde cero.
+ *
+ * REGLA DEL PROYECTO, aplicada aquí a propósito: GTK son aplicaciones con
+ * TEXTO DENSO (gestores de archivos, diálogos, navegadores) — van OPACAS.
+ * Por eso todos los fondos salen de [color.surface_opaque] y ni uno solo
+ * de [color.surface_glass]. "Cristal donde adorna, opacidad donde se lee"
+ * (CLAUDE.md). No añadas transparencia aquí sin releer esa regla.
+ */
+
+@define-color accent_color {{custom.technique_lapse_accent.hex}};
+@define-color accent_bg_color {{custom.technique_lapse_accent.hex}};
+@define-color accent_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color destructive_color {{custom.technique_reversal_accent.hex}};
+@define-color destructive_bg_color {{custom.technique_reversal_accent.hex}};
+@define-color destructive_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color success_color {{custom.syntax_green.hex}};
+@define-color success_bg_color {{custom.syntax_green.hex}};
+@define-color success_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color warning_color {{custom.syntax_amber.hex}};
+@define-color warning_bg_color {{custom.syntax_amber.hex}};
+@define-color warning_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color error_color {{custom.technique_reversal_accent.hex}};
+@define-color error_bg_color {{custom.technique_reversal_accent.hex}};
+@define-color error_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color window_bg_color {{custom.surface_opaque_void.hex}};
+@define-color window_fg_color {{custom.text_text.hex}};
+
+@define-color view_bg_color {{custom.surface_opaque_alt.hex}};
+@define-color view_fg_color {{custom.text_text.hex}};
+
+@define-color headerbar_bg_color {{custom.surface_opaque_alt.hex}};
+@define-color headerbar_fg_color {{custom.text_text.hex}};
+@define-color headerbar_border_color {{custom.surface_opaque_border.hex}};
+@define-color headerbar_backdrop_color @window_bg_color;
+@define-color headerbar_shade_color rgba(0, 0, 0, 0.36);
+
+@define-color card_bg_color {{custom.surface_opaque_alt.hex}};
+@define-color card_fg_color {{custom.text_text.hex}};
+@define-color card_shade_color rgba(0, 0, 0, 0.36);
+
+@define-color dialog_bg_color {{custom.surface_opaque_float.hex}};
+@define-color dialog_fg_color {{custom.text_text.hex}};
+
+@define-color popover_bg_color {{custom.surface_opaque_float.hex}};
+@define-color popover_fg_color {{custom.text_text.hex}};
+
+@define-color sidebar_bg_color {{custom.surface_opaque_alt.hex}};
+@define-color sidebar_fg_color {{custom.text_text.hex}};
+@define-color sidebar_backdrop_color {{custom.surface_opaque_void_dim.hex}};
+@define-color sidebar_border_color {{custom.surface_opaque_border.hex}};
+@define-color sidebar_shade_color rgba(0, 0, 0, 0.36);
+
+@define-color secondary_sidebar_bg_color {{custom.surface_opaque_void_dim.hex}};
+@define-color secondary_sidebar_fg_color {{custom.text_dim.hex}};
+@define-color secondary_sidebar_border_color {{custom.surface_opaque_border.hex}};
+
+@define-color borders {{custom.surface_opaque_border.hex}};
+@define-color theme_bg_color {{custom.surface_opaque_void.hex}};
+@define-color theme_fg_color {{custom.text_text.hex}};
+@define-color theme_base_color {{custom.surface_opaque_alt.hex}};
+@define-color theme_text_color {{custom.text_text.hex}};
+@define-color theme_selected_bg_color {{custom.technique_lapse_accent.hex}};
+@define-color theme_selected_fg_color {{custom.surface_opaque_void.hex}};
+
+@define-color insensitive_bg_color {{custom.surface_opaque_hl.hex}};
+@define-color insensitive_fg_color {{custom.text_mute.hex}};
+@define-color insensitive_base_color {{custom.surface_opaque_alt.hex}};
+
+/* selección de texto — el mismo par que usa Neovim para Visual */
+@define-color theme_unfocused_selected_bg_color {{custom.surface_opaque_sel.hex}};
+@define-color theme_unfocused_selected_fg_color {{custom.text_text.hex}};

@@ -1,0 +1,15 @@
+# themes/_templates/fzf.tmpl — plantilla de matugen para fzf.
+# Destino real: ~/.config/zsh/fzf-colors.zsh (sourced por
+# stow/zsh/.config/zsh/conf.d/60-fzf.zsh). Reemplaza los hex que ese
+# archivo tenía escritos a mano desde antes de que theme.toml existiera
+# — coincidían exactamente con los valores de aquí, confirmando que la
+# extracción de la Fase 1 fue completa.
+export FZF_DEFAULT_OPTS="
+  --height=52% --layout=reverse --border=rounded --info=inline
+  --color=fg:{{custom.text_dim.hex}},fg+:{{custom.text_text.hex}},bg:-1,bg+:{{custom.surface_opaque_hl.hex}}
+  --color=hl:{{custom.technique_lapse_accent.hex}},hl+:{{custom.technique_lapse_accent_core.hex}}
+  --color=border:{{custom.surface_opaque_border.hex}},header:{{custom.technique_hollow_accent.hex}},gutter:-1
+  --color=pointer:{{custom.technique_lapse_accent.hex}},marker:{{custom.technique_hollow_accent.hex}},spinner:{{custom.syntax_cyan.hex}}
+  --color=prompt:{{custom.technique_hollow_accent.hex}},info:{{custom.text_mute.hex}}
+  --pointer=❯ --marker=◈ --prompt='◈ ❯ '
+"

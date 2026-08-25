@@ -1,0 +1,23 @@
+# themes/_templates/lazydocker.tmpl — plantilla de matugen para lazydocker.
+# Destino real: ~/.config/lazydocker/config.yml
+#
+# Formato verificado contra docs/Config.md del repositorio de lazydocker
+# (jesseduffield/lazydocker): gui.theme con las mismas cuatro claves que
+# usa lazygit, cada una una LISTA (color + atributos), nunca un escalar.
+# Ojo: lazydocker expone MENOS claves de tema que lazygit — solo estas
+# cuatro están documentadas, no se inventan más.
+#
+# Criterio de mapeo idéntico al de themes/_templates/lazygit.tmpl para que
+# las dos TUI de la misma familia no se vean distintas una al lado de otra.
+
+gui:
+  theme:
+    activeBorderColor:
+      - "{{custom.technique_lapse_accent.hex}}"
+      - bold
+    inactiveBorderColor:
+      - "{{custom.surface_opaque_border.hex}}"
+    selectedLineBgColor:
+      - "{{custom.surface_opaque_sel.hex}}"
+    optionsTextColor:
+      - "{{custom.technique_lapse_accent.hex}}"

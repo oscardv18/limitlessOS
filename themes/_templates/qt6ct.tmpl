@@ -1,0 +1,33 @@
+# themes/_templates/qt6ct.tmpl — plantilla de matugen para Qt (qt6ct/qt5ct).
+# Destino real: ~/.config/qt6ct/colors/limitless.conf
+#     (y ~/.config/qt5ct/colors/limitless.conf — mismo formato exacto)
+# Se activa con `color_scheme_path=.../limitless.conf` en qt6ct.conf, más
+# QT_QPA_PLATFORMTHEME=qt6ct en el entorno de la sesión — eso ya lo pone
+# stow/hypr/.config/hypr/lua/env.lua (Fase 1).
+#
+# DECISIÓN: se tematiza vía qt6ct, NO vía Kvantum. Kvantum define su
+# aspecto con SVG (bordes, degradados, sombras dibujados a mano) — un
+# theme.toml de colores no puede generar un SVG, así que una "plantilla de
+# Kvantum" sería o inventarse un SVG entero, o mentir. qt6ct sí es color
+# puro y es exactamente lo que este pipeline puede alimentar de verdad.
+# (LIMITLESS-OS.md §7 lista "Qt/Kvantum" como una sola entrada; esto la
+# cubre por la mitad que es honestamente automatizable.)
+#
+# FORMATO: cada línea es una lista de 21 colores separados por coma, en el
+# orden de roles de QPalette:
+#   1 WindowText   2 Button      3 Light        4 Midlight    5 Dark
+#   6 Mid          7 Text        8 BrightText   9 ButtonText 10 Base
+#  11 Window      12 Shadow     13 Highlight   14 HighlightedText
+#  15 Link        16 LinkVisited 17 AlternateBase 18 NoRole
+#  19 ToolTipBase 20 ToolTipText 21 PlaceholderText
+# El orden es el de la enumeración QPalette::ColorRole de Qt. Conviene
+# verificarlo VISUALMENTE en hardware real la primera vez: un rol corrido
+# de sitio no da error, solo se ve raro en un widget concreto.
+#
+# Igual que GTK: Qt son apps de texto denso → OPACAS, todo sale de
+# [color.surface_opaque], nada de surface_glass (CLAUDE.md).
+
+[ColorScheme]
+active_colors={{custom.text_text.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_hl.hex}}, {{custom.surface_opaque_border.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.text_mute.hex}}, {{custom.text_text.hex}}, {{custom.text_text.hex}}, {{custom.text_text.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.technique_lapse_accent.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.technique_lapse_accent.hex}}, {{custom.technique_hollow_accent.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_float.hex}}, {{custom.text_text.hex}}, {{custom.text_mute.hex}}
+disabled_colors={{custom.text_mute.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_hl.hex}}, {{custom.surface_opaque_border.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.text_ghost.hex}}, {{custom.text_mute.hex}}, {{custom.text_dim.hex}}, {{custom.text_mute.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.surface_opaque_sel.hex}}, {{custom.text_mute.hex}}, {{custom.text_mute.hex}}, {{custom.text_mute.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_float.hex}}, {{custom.text_mute.hex}}, {{custom.text_ghost.hex}}
+inactive_colors={{custom.text_text.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_hl.hex}}, {{custom.surface_opaque_border.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.text_mute.hex}}, {{custom.text_text.hex}}, {{custom.text_text.hex}}, {{custom.text_text.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_void_dim.hex}}, {{custom.surface_opaque_sel.hex}}, {{custom.text_text.hex}}, {{custom.technique_lapse_accent.hex}}, {{custom.technique_hollow_accent.hex}}, {{custom.surface_opaque_alt.hex}}, {{custom.surface_opaque_void.hex}}, {{custom.surface_opaque_float.hex}}, {{custom.text_text.hex}}, {{custom.text_mute.hex}}

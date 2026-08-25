@@ -1,0 +1,36 @@
+# themes/_templates/ghostty.tmpl — plantilla de matugen para Ghostty.
+# Destino real: ~/.config/ghostty/colors (incluido por
+# stow/ghostty/.config/ghostty/config vía `config-file = ?colors`).
+# Criterio de mapeo tomado de stow/nvim/.config/nvim/colors/limitless.lua
+# líneas 320-328 — la paleta ANSI de 16 colores que ya usa el terminal
+# integrado de Neovim, con el comentario propio de ese archivo diciendo
+# "los mismos 16 colores que usa Ghostty": no se reinterpreta la paleta,
+# se reutiliza tal cual para que :terminal y Ghostty nunca se contradigan.
+# Sintaxis de color de Ghostty acepta hex con o sin '#' — se usa con '#'
+# por legibilidad, verificado contra ghostty.org/docs/config/reference.
+
+background = {{custom.surface_opaque_void.hex}}
+foreground = {{custom.text_text.hex}}
+
+cursor-color = {{custom.technique_lapse_accent.hex}}
+cursor-text = {{custom.surface_opaque_void.hex}}
+
+selection-background = {{custom.surface_opaque_sel.hex}}
+selection-foreground = {{custom.text_text.hex}}
+
+palette = 0={{custom.surface_opaque_hl.hex}}
+palette = 1={{custom.technique_reversal_accent.hex}}
+palette = 2={{custom.syntax_green.hex}}
+palette = 3={{custom.syntax_amber.hex}}
+palette = 4={{custom.technique_lapse_accent.hex}}
+palette = 5={{custom.technique_hollow_accent.hex}}
+palette = 6={{custom.syntax_cyan.hex}}
+palette = 7={{custom.text_dim.hex}}
+palette = 8={{custom.text_mute.hex}}
+palette = 9={{custom.syntax_coral.hex}}
+palette = 10={{custom.syntax_green.hex}}
+palette = 11={{custom.syntax_orange.hex}}
+palette = 12={{custom.technique_lapse_accent_core.hex}}
+palette = 13={{custom.syntax_magenta.hex}}
+palette = 14={{custom.syntax_cyan.hex}}
+palette = 15={{custom.text_text.hex}}

@@ -1,0 +1,33 @@
+# themes/_templates/herdr.tmpl — plantilla de matugen para herdr.
+# Destino real: ~/.config/herdr/config.toml
+#
+# ⚠ PLANTILLA INCOMPLETA A PROPÓSITO — LEE ESTO ANTES DE AMPLIARLA ⚠
+#
+# De la documentación de herdr (herdr.dev/docs/configuration/) se confirmó:
+#   - existe [theme] con `name` (tema incorporado) y `auto_switch`
+#   - existe [theme.custom] que SÍ acepta hex ("Color values accept hex,
+#     named colors, rgb(r,g,b), or reset aliases")
+#   - dos nombres de clave concretos: `sidebar_bg` y `accent`
+#
+# Lo que NO se pudo confirmar: la lista COMPLETA de claves de
+# [theme.custom]. La documentación pública muestra un ejemplo, no la
+# referencia exhaustiva. Escribir más claves aquí sería inventarlas —
+# justo lo que CLAUDE.md prohíbe ("verifica antes de afirmar").
+#
+# CÓMO COMPLETARLA (en la máquina real, tras instalar herdr):
+#     herdr --default-config > /tmp/herdr-default.toml
+# Ese volcado trae todas las claves reales de [theme.custom]. Añádelas
+# aquí mapeadas a las variables de theme.toml, con el mismo criterio de
+# rol que el resto del ecosistema (acento = técnica activa, rojo = error).
+#
+# El puente herdr → HUD (bin/cmd/herdr-bridge) NO depende de esta
+# plantilla: lee estados por el socket JSON, no por el color del tema.
+# Que esto esté incompleto no bloquea la integración de la Fase 5.
+
+[theme]
+name = "terminal"
+auto_switch = false
+
+[theme.custom]
+sidebar_bg = "{{custom.surface_opaque_alt.hex}}"
+accent = "{{custom.technique_lapse_accent.hex}}"

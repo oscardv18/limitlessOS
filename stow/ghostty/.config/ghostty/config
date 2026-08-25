@@ -1,0 +1,25 @@
+# stow/ghostty/.config/ghostty/config — Fase 2 (LIMITLESS-OS.md §6).
+# Ajustes no relacionados con color. Todo lo que sí es color vive en
+# ./colors, un archivo GENERADO por matugen (themes/_templates/ghostty.tmpl,
+# via bin/cmd/theme-export) — nunca a mano aquí, regla de CLAUDE.md
+# ("ningún hex literal fuera de themes/").
+#
+# Sintaxis verificada contra ghostty.org/docs/config/reference y el
+# manual `ghostty(5)` de Arch: `clave = valor` por línea, sin secciones,
+# config-file = ruta` para incluir otro archivo (se procesa al final del
+# archivo, sin importar dónde se declare la línea).
+
+font-family = JetBrains Mono
+font-size = 12
+cursor-style = bar
+cursor-style-blink = true
+
+window-decoration = none
+background-opacity = 0.86
+background-blur = 24
+unfocused-split-opacity = 0.55
+
+# el resto de flags de portal/Wayland ya se gestionan a nivel de sesión
+# (env.lua, Fase 1) — Ghostty en sí ya es nativo Wayland, no XWayland.
+
+config-file = ?colors

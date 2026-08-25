@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# dot:summary=Genera themes/matugen.toml y hyprlock-colors.conf desde theme.toml
+# dot:group=sistema
+# dot:glyph=◈
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# Puente entre themes/hud-void/theme.toml (fuente única de color,
+# LIMITLESS-OS.md §4.4) y matugen. theme.toml NO es la entrada nativa de
+# matugen — matugen deriva paletas de una imagen o un color semilla
+# (Material You); este proyecto no quiere esa derivación algorítmica,
+# quiere cada hex exacto ya decidido a mano. La solución real, verificada
+# contra la wiki de matugen (github.com/InioX/matugen/wiki/Configuration):
+# [config.custom_colors] con blend=false por color, invocando matugen con
+# CUALQUIER semilla — las plantillas solo referencian {{custom.*.hex}},
+# nunca {{colors.*}} (el esquema derivado se ignora por completo).
+#
+# Este script GENERA themes/matugen.toml — nunca se edita a mano, es un
+# artefacto de compilación igual que un .o. Corre en install/stages/50-theme.sh
+# antes de invocar matugen, y puede correrse suelto para depurar.
+#
+# También escribe ~/.config/hypr/hyprlock-colors.conf directo, sin pasar
+# por matugen: hyprlock usa el formato nativo de Hyprland rgba(RRGGBBAA)
+# (8 dígitos hex, alpha incluido), no el rgba(r,g,b,a) estilo CSS que usa
+# [color.surface_glass] en theme.toml — la conversión es aritmética
+# (RGB 0-255 → hex, alpha 0-1 → hex), más simple aquí que en el lenguaje
+# de plantillas de matugen. Contrato ya fijado en hyprlock.conf (Fase 3):
+# $accent $accent_core $surface_hi $line $text $text_dim $reversal $void
+
+set -euo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_fail() { echo "  [ERR] $1"; }
+  ui_info() { echo "  [INFO] $1"; }
+fi
+
+THEME_TOML="$REPO_DIR/themes/hud-void/theme.toml"
+MATUGEN_TOML="$REPO_DIR/themes/matugen.toml"
+TEMPLATES_DIR="$REPO_DIR/themes/_templates"
+
+[[ -f "$THEME_TOML" ]] || { ui_fail "no existe $THEME_TOML"; exit 1; }
+
+# '#' solo es comentario fuera de comillas — mismo cuidado que Theme.qml
+# (Fase 4): un hex como "#04060d" no debe truncarse por su propio '#'.
+_strip_comment() {
+  local line="$1" in_str=0 out="" c
+  local i len=${#line}
+  for (( i = 0; i < len; i++ )); do
+    c="${line:i:1}"
+    if [[ "$c" == '"' ]]; then in_str=$((1 - in_str)); fi
+    if [[ "$c" == '#' && $in_str -eq 0 ]]; then break; fi
+    out+="$c"
+  done
+  printf '%s' "$out"
+}
+
+# rgba(R,G,B,A) estilo CSS → rrggbbaa (hex, 8 dígitos, sin '#') — formato
+# nativo de Hyprland/hyprlock.
+_css_rgba_to_hyprlang() {
+  local raw="$1" r g b a
+  raw="${raw#rgba(}"; raw="${raw%)}"
+  IFS=',' read -r r g b a <<<"$raw"
+  r="$(printf '%02x' "$(printf '%.0f' "$r")")"
+  g="$(printf '%02x' "$(printf '%.0f' "$g")")"
+  b="$(printf '%02x' "$(printf '%.0f' "$b")")"
+  a="$(printf '%02x' "$(printf '%.0f' "$(echo "$a" | awk '{print $1*255}')")")"
+  printf '%s%s%s%s' "$r" "$g" "$b" "$a"
+}
+
+# Destino real de cada plantilla. Vive aquí y no en la cabecera de cada
+# .tmpl porque matugen necesita output_path DENTRO de matugen.toml — un
+# comentario dentro de la plantilla no lo lee nadie. Una plantilla nueva
+# sin entrada aquí se omite con aviso: mejor que escribir en una ruta
+# adivinada. Varias líneas = varios destinos para la misma plantilla.
+_output_paths_for() {
+  case "$1" in
+    ghostty)    echo "$HOME/.config/ghostty/colors" ;;
+    btop)       echo "$HOME/.config/btop/themes/limitless.theme" ;;
+    fzf)        echo "$HOME/.config/zsh/fzf-colors.zsh" ;;
+    lazygit)    echo "$HOME/.config/lazygit/config.yml" ;;
+    lazydocker) echo "$HOME/.config/lazydocker/config.yml" ;;
+    yazi)       echo "$HOME/.config/yazi/theme.toml" ;;
+    bat)        echo "$HOME/.config/bat/themes/limitless.tmTheme" ;;
+    delta)      echo "$HOME/.config/git/delta-limitless.gitconfig" ;;
+    herdr)      echo "$HOME/.config/herdr/config.toml" ;;
+    # hyprlock NO va aquí: este mismo script escribe hyprlock-colors.conf
+    # directo (formato rgba() nativo de Hyprland, más abajo). Declararlo
+    # también como plantilla de matugen provocaría dos escrituras a la
+    # misma ruta, y ganaría la última — un bug silencioso.
+    gtk)        printf '%s\n%s\n' "$HOME/.config/gtk-3.0/gtk.css" "$HOME/.config/gtk-4.0/gtk.css" ;;
+    qt6ct)      printf '%s\n%s\n' "$HOME/.config/qt6ct/colors/limitless.conf" "$HOME/.config/qt5ct/colors/limitless.conf" ;;
+    *)          echo "" ;;
+  esac
+}
+
+declare -A COLORS       # nombre_matugen -> valor hex (sin rgba)
+declare -A SURFACE_GLASS # clave -> valor rgba(...) tal cual, solo surface_glass
+current_section=""
+
+while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
+  line="$(_strip_comment "$raw_line")"
+  line="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$line")"
+  [[ -z "$line" ]] && continue
+
+  if [[ "$line" =~ ^\[([a-zA-Z0-9_.]+)\]$ ]]; then
+    current_section="${BASH_REMATCH[1]}"
+    continue
+  fi
+
+  if [[ "$line" =~ ^([a-zA-Z0-9_]+)[[:space:]]*=[[:space:]]*(.+)$ ]]; then
+    key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[2]}"
+    value="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$value")"
+    # solo nos interesan las secciones color.* — font/geometry/meta no
+    # generan color para matugen ni para hyprlock
+    [[ "$current_section" == color.* ]] || continue
+
+    if [[ "$value" =~ ^\"#[0-9a-fA-F]{6}\"$ ]]; then
+      hexval="${value//\"/}"
+      slug="${current_section#color.}"
+      slug="${slug//./_}"
+      COLORS["${slug}_${key}"]="$hexval"
+    elif [[ "$current_section" == "color.surface_glass" && "$value" =~ ^\"rgba\( ]]; then
+      SURFACE_GLASS["$key"]="${value//\"/}"
+    fi
+  fi
+done <"$THEME_TOML"
+
+(( ${#COLORS[@]} > 0 )) || { ui_fail "no se extrajo ningún color de $THEME_TOML — ¿cambió el formato?"; exit 1; }
+
+# ── themes/matugen.toml ──────────────────────────────────────────────────
+mkdir -p "$TEMPLATES_DIR"
+{
+  echo "# themes/matugen.toml — GENERADO por bin/cmd/theme-export desde"
+  echo "# themes/hud-void/theme.toml. NO EDITAR A MANO — se sobrescribe en"
+  echo "# cada corrida de install/stages/50-theme.sh o 'dotctl theme-export'."
+  echo "# Las plantillas referencian {{custom.NOMBRE.hex}}, nunca {{colors.*}}"
+  echo "# (el esquema Material You derivado del color semilla se ignora)."
+  echo
+  echo "[config.custom_colors]"
+  for name in "${!COLORS[@]}"; do
+    printf '%s = { color = "%s", blend = false }\n' "$name" "${COLORS[$name]}"
+  done | sort
+  echo
+  echo "# ── plantillas ──────────────────────────────────────────────────"
+  echo "# Un bloque por cada themes/_templates/<app>.tmpl. El destino sale"
+  echo "# de _output_path_for() en bin/cmd/theme-export — una plantilla sin"
+  echo "# destino conocido se OMITE con aviso, nunca se adivina la ruta."
+  if compgen -G "$TEMPLATES_DIR/*.tmpl" >/dev/null 2>&1; then
+    for tmpl in "$TEMPLATES_DIR"/*.tmpl; do
+      base="$(basename "$tmpl" .tmpl)"
+      # una plantilla puede tener más de un destino (gtk3 + gtk4, qt5 + qt6)
+      outs="$(_output_paths_for "$base")"
+      if [[ -z "$outs" ]]; then
+        echo >&2 "  · aviso: $base.tmpl no tiene destino declarado en _output_paths_for() — se omite"
+        continue
+      fi
+      idx=0
+      while IFS= read -r out; do
+        [[ -n "$out" ]] || continue
+        name="$base"
+        (( idx > 0 )) && name="${base}${idx}"
+        echo
+        echo "[templates.$name]"
+        echo "input_path = '$tmpl'"
+        echo "output_path = '$out'"
+        idx=$((idx + 1))
+      done <<<"$outs"
+    done
+  fi
+} >"$MATUGEN_TOML"
+
+ui_ok "themes/matugen.toml generado (${#COLORS[@]} colores, $(compgen -G "$TEMPLATES_DIR/*.tmpl" 2>/dev/null | wc -l) plantillas)"
+
+# ── ~/.config/hypr/hyprlock-colors.conf ──────────────────────────────────
+if [[ -n "${SURFACE_GLASS[surface_hi]:-}" && -n "${SURFACE_GLASS[line]:-}" ]]; then
+  technique="${LIMITLESS_TECHNIQUE:-lapse}"
+  accent="${COLORS[technique_${technique}_accent]:-${COLORS[technique_lapse_accent]:-3b9eff}}"
+  accent_core="${COLORS[technique_${technique}_accent_core]:-${COLORS[technique_lapse_accent_core]:-8fe3ff}}"
+  text_c="${COLORS[text_text]:-eaf2ff}"
+  text_dim_c="${COLORS[text_dim]:-7e93b0}"
+  reversal_c="${COLORS[technique_reversal_accent]:-ff4a2e}"
+  void_c="${COLORS[surface_opaque_void]:-04060d}"
+
+  hypr_dir="$HOME/.config/hypr"
+  mkdir -p "$hypr_dir"
+  {
+    echo "# ~/.config/hypr/hyprlock-colors.conf — GENERADO por bin/cmd/theme-export"
+    echo "# desde themes/hud-void/theme.toml. NO EDITAR A MANO."
+    # rgb()/rgba() de Hyprland quieren hex SIN '#' — los valores de COLORS
+    # sí lo llevan (matugen, en cambio, lo quiere CON '#' — visto arriba).
+    echo "\$accent = rgb(${accent#\#})"
+    echo "\$accent_core = rgb(${accent_core#\#})"
+    echo "\$surface_hi = rgba($(_css_rgba_to_hyprlang "${SURFACE_GLASS[surface_hi]}"))"
+    echo "\$line = rgba($(_css_rgba_to_hyprlang "${SURFACE_GLASS[line]}"))"
+    echo "\$text = rgb(${text_c#\#})"
+    echo "\$text_dim = rgb(${text_dim_c#\#})"
+    echo "\$reversal = rgb(${reversal_c#\#})"
+    echo "\$void = rgb(${void_c#\#})"
+  } >"$hypr_dir/hyprlock-colors.conf"
+  ui_ok "~/.config/hypr/hyprlock-colors.conf generado (técnica: $technique)"
+else
+  ui_info "color.surface_glass incompleto en theme.toml — hyprlock-colors.conf no se tocó"
+fi

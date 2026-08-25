@@ -1,0 +1,136 @@
+# themes/_templates/yazi.tmpl — plantilla de matugen para yazi.
+# Destino real: ~/.config/yazi/theme.toml
+#
+# Nombres de sección y clave verificados verbatim contra el preset oficial
+# del propio repositorio de yazi (sxyazi/yazi, yazi-config/preset/theme-dark.toml)
+# — no inventados. yazi acepta hex "#RRGGBB" además de los 17 colores ANSI
+# con nombre, así que la paleta entra completa.
+#
+# [flavor] se deja vacío a propósito: un flavor externo pisaría estos
+# valores, y la fuente de verdad de color de este proyecto es theme.toml,
+# no un flavor de terceros.
+
+[flavor]
+dark  = ""
+light = ""
+
+[mgr]
+cwd = { fg = "{{custom.technique_lapse_accent.hex}}" }
+
+find_keyword  = { fg = "{{custom.syntax_amber.hex}}", bold = true, italic = true, underline = true }
+find_position = { fg = "{{custom.syntax_magenta.hex}}", bg = "reset", bold = true, italic = true }
+
+symlink_target = { fg = "{{custom.text_mute.hex}}", italic = true }
+
+marker_copied   = { fg = "{{custom.syntax_green.hex}}",  bg = "{{custom.syntax_green.hex}}" }
+marker_cut      = { fg = "{{custom.technique_reversal_accent.hex}}", bg = "{{custom.technique_reversal_accent.hex}}" }
+marker_marked   = { fg = "{{custom.syntax_cyan.hex}}",   bg = "{{custom.syntax_cyan.hex}}" }
+marker_selected = { fg = "{{custom.syntax_amber.hex}}",  bg = "{{custom.syntax_amber.hex}}" }
+marker_symbol   = "│"
+
+count_copied   = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.syntax_green.hex}}" }
+count_cut      = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.technique_reversal_accent.hex}}" }
+count_selected = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.syntax_amber.hex}}" }
+
+border_symbol = "│"
+border_style  = { fg = "{{custom.surface_opaque_border.hex}}" }
+
+syntect_theme = ""
+
+[tabs]
+active   = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.technique_lapse_accent.hex}}", bold = true }
+inactive = { fg = "{{custom.text_dim.hex}}", bg = "{{custom.surface_opaque_hl.hex}}" }
+
+sep_inner = { open = "", close = "" }
+sep_outer = { open = "", close = "" }
+
+[mode]
+normal_main = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.technique_lapse_accent.hex}}", bold = true }
+normal_alt  = { fg = "{{custom.technique_lapse_accent.hex}}", bg = "{{custom.surface_opaque_hl.hex}}" }
+
+select_main = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.technique_hollow_accent.hex}}", bold = true }
+select_alt  = { fg = "{{custom.technique_hollow_accent.hex}}", bg = "{{custom.surface_opaque_hl.hex}}" }
+
+unset_main = { fg = "{{custom.surface_opaque_void.hex}}", bg = "{{custom.technique_reversal_accent.hex}}", bold = true }
+unset_alt  = { fg = "{{custom.technique_reversal_accent.hex}}", bg = "{{custom.surface_opaque_hl.hex}}" }
+
+[indicator]
+parent  = { reversed = true }
+current = { reversed = true }
+preview = { underline = true }
+padding = { open = "", close = "" }
+
+[status]
+overall   = {}
+sep_left  = { open = "", close = "" }
+sep_right = { open = "", close = "" }
+
+perm_sep   = { fg = "{{custom.text_mute.hex}}" }
+perm_type  = { fg = "{{custom.syntax_green.hex}}" }
+perm_read  = { fg = "{{custom.syntax_amber.hex}}" }
+perm_write = { fg = "{{custom.technique_reversal_accent.hex}}" }
+perm_exec  = { fg = "{{custom.syntax_cyan.hex}}" }
+
+progress_label  = { fg = "{{custom.text_text.hex}}", bold = true }
+progress_normal = { fg = "{{custom.technique_lapse_accent.hex}}", bg = "{{custom.surface_opaque_hl.hex}}" }
+progress_error  = { fg = "{{custom.syntax_amber.hex}}", bg = "{{custom.technique_reversal_accent.hex}}" }
+
+[which]
+border          = { fg = "{{custom.technique_lapse_accent.hex}}" }
+cols            = 3
+mask            = {}
+cand            = { fg = "{{custom.syntax_cyan.hex}}" }
+rest            = { fg = "{{custom.text_mute.hex}}" }
+desc            = { fg = "{{custom.technique_hollow_accent.hex}}" }
+separator       = "  "
+separator_style = { fg = "{{custom.text_mute.hex}}" }
+
+[confirm]
+border     = { fg = "{{custom.technique_lapse_accent.hex}}" }
+title      = { fg = "{{custom.technique_lapse_accent.hex}}" }
+body       = {}
+list       = {}
+btn_yes    = { reversed = true }
+btn_no     = {}
+btn_labels = [ "  [S]í  ", "  (N)o  " ]
+
+[spot]
+border = { fg = "{{custom.technique_lapse_accent.hex}}" }
+title  = { fg = "{{custom.technique_lapse_accent.hex}}" }
+
+tbl_col  = { fg = "{{custom.technique_lapse_accent.hex}}" }
+tbl_cell = { fg = "{{custom.syntax_amber.hex}}", reversed = true }
+
+[notify]
+title_info  = { fg = "{{custom.syntax_green.hex}}" }
+title_warn  = { fg = "{{custom.syntax_amber.hex}}" }
+title_error = { fg = "{{custom.technique_reversal_accent.hex}}" }
+
+icon_info  = ""
+icon_warn  = ""
+icon_error = ""
+
+[pick]
+border   = { fg = "{{custom.technique_lapse_accent.hex}}" }
+active   = { fg = "{{custom.technique_hollow_accent.hex}}", bold = true }
+inactive = {}
+
+[input]
+border   = { fg = "{{custom.technique_lapse_accent.hex}}" }
+title    = {}
+value    = {}
+selected = { reversed = true }
+
+[cmp]
+border   = { fg = "{{custom.technique_lapse_accent.hex}}" }
+active   = { reversed = true }
+inactive = {}
+
+icon_file    = ""
+icon_folder  = ""
+icon_command = ""
+
+[tasks]
+border  = { fg = "{{custom.technique_lapse_accent.hex}}" }
+title   = {}
+hovered = { fg = "{{custom.technique_hollow_accent.hex}}", underline = true }

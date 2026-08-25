@@ -1,0 +1,58 @@
+# themes/_templates/delta.tmpl — plantilla de matugen para delta.
+# Destino real: ~/.config/git/delta-limitless.gitconfig
+# Se activa incluyéndolo desde ~/.gitconfig:
+#     [include]
+#         path = ~/.config/git/delta-limitless.gitconfig
+#     [core]
+#         pager = delta
+#     [interactive]
+#         diffFilter = delta --color-only
+#
+# Formato verificado contra dandavison.github.io/delta/custom-themes.html:
+# un "tema" de delta es un `feature` con nombre — una sección
+# [delta "nombre"] — que se activa con `delta.features`. Los estilos
+# aceptan hex directo y palabras clave de atributo (bold, ul, box…).
+#
+# syntax-theme apunta al tema de bat: delta usa la MISMA caché de sintaxis
+# que bat (ambos usan syntect), así que "limitless" existe ahí en cuanto
+# corre `bat cache --build` — ver themes/_templates/bat.tmpl.
+
+[delta]
+    features = limitless
+    navigate = true
+    line-numbers = true
+    syntax-theme = limitless
+    true-color = always
+
+[delta "limitless"]
+    dark = true
+
+    minus-style                   = normal "{{custom.state_delete.hex}}"
+    minus-emph-style              = normal "{{custom.technique_reversal_accent.hex}}"
+    minus-non-emph-style          = normal "{{custom.state_delete.hex}}"
+    plus-style                    = normal "{{custom.state_add.hex}}"
+    plus-emph-style               = normal "{{custom.syntax_green.hex}}"
+    plus-non-emph-style           = normal "{{custom.state_add.hex}}"
+
+    line-numbers-minus-style      = "{{custom.technique_reversal_accent.hex}}"
+    line-numbers-plus-style       = "{{custom.syntax_green.hex}}"
+    line-numbers-zero-style       = "{{custom.text_mute.hex}}"
+    line-numbers-left-style       = "{{custom.surface_opaque_border.hex}}"
+    line-numbers-right-style      = "{{custom.surface_opaque_border.hex}}"
+
+    file-style                    = "{{custom.technique_lapse_accent.hex}}" bold
+    file-decoration-style         = "{{custom.surface_opaque_border.hex}}" ul
+    hunk-header-style             = "{{custom.text_dim.hex}}"
+    hunk-header-decoration-style  = "{{custom.surface_opaque_border.hex}}" box
+    hunk-header-file-style        = "{{custom.technique_lapse_accent_core.hex}}"
+    hunk-header-line-number-style = "{{custom.technique_hollow_accent.hex}}"
+
+    blame-palette                 = "{{custom.surface_opaque_void.hex}}" "{{custom.surface_opaque_alt.hex}}" "{{custom.surface_opaque_hl.hex}}"
+
+    merge-conflict-begin-symbol   = "▁"
+    merge-conflict-end-symbol     = "▔"
+    merge-conflict-ours-diff-header-style      = "{{custom.syntax_amber.hex}}" bold
+    merge-conflict-theirs-diff-header-style    = "{{custom.syntax_amber.hex}}" bold
+
+    whitespace-error-style        = "{{custom.technique_reversal_accent.hex}}" reverse
+    zero-style                    = syntax
