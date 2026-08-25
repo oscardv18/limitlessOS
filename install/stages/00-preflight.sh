@@ -15,8 +15,30 @@
 _disable_plymouth() {
   pacman -Qq plymouth &>/dev/null || { echo "plymouth no está instalado, nada que hacer"; return 0; }
 
-  # 1. sólo los paquetes que de verdad están instalados — pacman -R falla
-  #    si le pides quitar algo que no existe, y eso no debe frenar la etapa
+  # ORDEN CORREGIDO tras un despliegue real: HOOKS= se limpia PRIMERO,
+  # antes de quitar el paquete. Al revés (como estaba) pasa esto: pacman
+  # -R plymouth dispara su propio hook de postinstalación que regenera el
+  # initramfs — pero HOOKS= todavía dice "plymouth" y el script del hook
+  # ya se borró con el paquete, así que esa regeneración automática falla
+  # con "Hook 'plymouth' cannot be found" y deja escrito en /boot un
+  # initramfs marcado "may not be complete". El script lo corregía un
+  # paso después con su propio `mkinitcpio -P`, así que el resultado final
+  # quedaba bien — pero si la máquina se apaga justo en esa ventana, el
+  # initramfs roto es el que queda. Limpiar HOOKS= antes cierra esa
+  # ventana: cuando el hook de pacman se dispare, ya no menciona plymouth.
+
+  # 1. HOOKS=(...) en mkinitcpio.conf — respaldo primero, y el sed sólo
+  #    toca la palabra "plymouth" dentro de esa línea concreta, nunca el
+  #    archivo entero, para no arriesgar ninguna otra línea
+  if grep -q '^HOOKS=.*\bplymouth\b' /etc/mkinitcpio.conf 2>/dev/null; then
+    sudo cp /etc/mkinitcpio.conf "/etc/mkinitcpio.conf.bak.$(date +%s)"
+    sudo sed -i -E '/^HOOKS=/ s/\bplymouth[[:space:]]*//; /^HOOKS=/ s/[[:space:]]+\)/)/' /etc/mkinitcpio.conf
+  fi
+
+  # 2. sólo los paquetes que de verdad están instalados — pacman -R falla
+  #    si le pides quitar algo que no existe, y eso no debe frenar la etapa.
+  #    Esto ya dispara la regeneración del initramfs por su cuenta (el hook
+  #    de pacman), ahora con HOOKS= ya limpio — no hace falta llamarlo aparte.
   local candidates=(plymouth cachyos-plymouth-bootanimation cachyos-plymouth-theme plymouth-kcm)
   local installed=()
   local p
@@ -25,15 +47,6 @@ _disable_plymouth() {
   done
   if (( ${#installed[@]} > 0 )); then
     sudo pacman -Rns --noconfirm "${installed[@]}" || return 1
-  fi
-
-  # 2. HOOKS=(...) en mkinitcpio.conf — respaldo primero, y el sed sólo
-  #    toca la palabra "plymouth" dentro de esa línea concreta, nunca el
-  #    archivo entero, para no arriesgar ninguna otra línea
-  if grep -q '^HOOKS=.*\bplymouth\b' /etc/mkinitcpio.conf 2>/dev/null; then
-    sudo cp /etc/mkinitcpio.conf "/etc/mkinitcpio.conf.bak.$(date +%s)"
-    sudo sed -i -E '/^HOOKS=/ s/\bplymouth[[:space:]]*//; /^HOOKS=/ s/[[:space:]]+\)/)/' /etc/mkinitcpio.conf
-    sudo mkinitcpio -P || return 1
   fi
 
   # 3. quiet/splash del cmdline — mismo respaldo que ya usa 60-session.sh
@@ -48,6 +61,45 @@ _disable_plymouth() {
   echo "plymouth eliminado — el siguiente arranque muestra texto plano, sin animación"
 }
 export -f _disable_plymouth
+
+# ── paquetes que YA vienen instalados en la máquina y chocan de frente
+#    con lo que pide packages/pacman.txt ──────────────────────────────────
+# Encontrado en un despliegue real: pipewire-jack conflictúa con jack2
+# (ambos declaran provides=jack — son intercambiables, pero pacman nunca
+# migra solo porque pipewire-jack no declara replaces=jack2). Con
+# --noconfirm, el prompt "¿Quitar jack2? [s/N]" toma el default (N), la
+# transacción entera aborta con "dependencias en conflicto" — y como es
+# una transacción atómica, NINGÚN paquete de esa corrida de pacman se
+# instala, no solo pipewire-jack. Mismo patrón real con
+# pulseaudio/pipewire-pulse, aunque no se manifestó en esa corrida porque
+# esa instalación de CachyOS ya traía pipewire-pulse de fábrica — otros
+# perfiles de CachyOS (o de cualquier distro base Arch) sí pueden traer
+# pulseaudio puro.
+#
+# La resolución es seleccionar el paquete de PipeWire, no una decisión al
+# azar: es lo que el resto del sistema espera (wireplumber ya está en la
+# lista, PIPEWIRE_SESSION_MANAGER, todo lo demás asume pipewire). `-Rdd`
+# quita SOLO el paquete nombrado, sin arrastrar lo que dependa de él — un
+# paquete que dependía del jack2 nombrado a secas queda con una
+# dependencia "huérfana" que `pacman -Dk` reportaría, pero sigue
+# funcionando porque pipewire-jack provee la misma interfaz.
+_resolve_pipewire_conflicts() {
+  local pairs=("jack2:pipewire-jack" "pulseaudio:pipewire-pulse")
+  local pair old new
+  for pair in "${pairs[@]}"; do
+    old="${pair%%:*}"
+    new="${pair##*:}"
+    if pacman -Qq "$old" &>/dev/null; then
+      echo "AVISO: '$old' ya está instalado y conflictúa con '$new' (packages/pacman.txt) — quitando '$old' primero"
+      sudo pacman -Rdd --noconfirm "$old" || {
+        echo "  no se pudo quitar '$old' — revísalo a mano antes de reintentar la instalación" >&2
+        return 1
+      }
+    fi
+  done
+  return 0
+}
+export -f _resolve_pipewire_conflicts
 
 # ── conflicto real con el perfil XFCE de CachyOS ──────────────────────────
 # El perfil XFCE del instalador de CachyOS trae `cachyos-xfce-settings`,
@@ -87,6 +139,9 @@ stage_main() {
     ui_warn "no se pudo quitar Plymouth del todo — revisa /etc/mkinitcpio.conf y /etc/default/grub a mano"
 
   ui_spin "Buscando conflictos conocidos con paquetes de CachyOS" -- _check_cachyos_zsh || true
+
+  ui_spin "Resolviendo conflictos conocidos de audio (jack2/pulseaudio)" -- _resolve_pipewire_conflicts || \
+    ui_warn "no se pudieron resolver a tiempo — 10-core.sh puede fallar si jack2 o pulseaudio siguen instalados"
 
 
   ui_info "arquitectura: $(uname -m)"
