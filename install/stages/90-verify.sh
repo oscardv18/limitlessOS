@@ -16,7 +16,7 @@ stage_main() {
   ui_divider
   if (( rc == 0 )); then
     ui_banner "LISTO" "無下限 — puedes reiniciar cuando quieras"
-    ui_info "al arrancar: greetd te recibe con tuigreet, en la paleta Limitless"
+    ui_info "al arrancar: LightDM te recibe con el tema Limitless"
     ui_info "si algo falla: Ctrl+Alt+F2 → Hyprland -c ~/.limitless/dev/minimal.conf"
   else
     ui_warn "hay avisos sin resolver. Revísalos antes de reiniciar si puedes."

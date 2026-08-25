@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Hyprland Limitless
+Comment=蒼 + 赫 → 茈
+Exec=uwsm start -- hyprland.desktop
+Type=Application
+DesktopNames=Hyprland

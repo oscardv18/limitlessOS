@@ -1,6 +1,8 @@
 # Paleta de la consola virtual
 
-> Esto es lo que hace que tuigreet —y todos tus TTY— se vean Limitless.
+> **Nota:** este archivo se escribió cuando el greeter era `tuigreet` (superado por LightDM + `lightdm-webkit2-greeter`, ver `LIMITLESS-OS.md` §2 — LightDM no usa la paleta del VT, tiene su propio tema en HTML/CSS/JS). El razonamiento de abajo sigue siendo válido igual: cualquier TTY al que caigas (`Ctrl+Alt+F2`, rescate) sigue usando esta paleta remapeada, con o sin greeter gráfico encima.
+
+> Esto es lo que hace que cualquier TTY se vea Limitless — tuigreet, en su momento, fue el ejemplo original que motivó el arreglo.
 
 ## El problema
 
@@ -71,8 +73,8 @@ FONT=ter-v18n          # paquete: terminus-font
 
 Terminus a 18px es lo más cercano a JetBrains Mono que existe como fuente de consola. Los kanji del saludo (`無下限`) **no se renderizan en el VT** — la consola del kernel no tiene esos glifos. Si te importa, quita la parte japonesa del `--greeting` y deja solo `⬡ L I M I T L E S S`.
 
-## Límite honesto de tuigreet
+## Límite honesto — y ya superado
 
-Con esto tuigreet queda en tus colores exactos, con tu disposición y tu saludo. Lo que **no** puede hacer, por ser una TUI sobre consola: cristal, blur, el campo de colisión, tipografía proporcional, animación.
+Esta paleta ANSI remapeada seguía teniendo un techo: por ser una TUI sobre consola, `tuigreet` no podía hacer cristal, blur, el campo de colisión, tipografía proporcional ni animación. Esa era exactamente la mejora anotada como pendiente en la versión anterior de este archivo.
 
-Si algún día quieres esa fidelidad completa en el login, el camino es **`regreet`** (greeter GTK para greetd, tematizable con CSS completo) o un greeter propio en Quickshell lanzado por greetd. Ambos reproducirían el diseño real de la pantalla de bloqueo. Es bastante más trabajo y no bloquea nada: queda anotado como mejora, no como pendiente.
+**Ya está resuelto, por otra vía.** `system/lightdm/` reemplazó al greeter TUI por `lightdm-webkit2-greeter` — HTML/CSS/JS real, con `backdrop-filter` funcional. El cristal, el campo de colisión y la tipografía proporcional que aquí eran una limitación honesta, ahora existen de verdad en el login. Este archivo se queda solo por lo que sigue siendo cierto: la paleta del VT importa para cualquier TTY de rescate, que no pasa por LightDM.

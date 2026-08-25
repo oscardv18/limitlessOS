@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Limitless</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="field"></canvas>
+  <div id="veil"></div>
+
+  <div id="stage">
+    <div class="mark">⬡ L I M I T L E S S</div>
+    <div class="time">21:47</div>
+    <div class="date"></div>
+
+    <div id="panel" class="glass">
+      <div class="who">
+        <span class="av">六</span>
+        <div>
+          <div class="uname">gojo</div>
+          <div class="host"></div>
+        </div>
+      </div>
+      <div id="prompt-row">
+        <span id="prompt-label">contraseña</span>
+        <input id="prompt-input" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <div id="msg">&nbsp;</div>
+      <div id="sessions"></div>
+    </div>
+
+    <div id="power">
+      <span class="power-btn" id="pw-suspend" title="suspender">◑</span>
+      <span class="power-btn" id="pw-restart" title="reiniciar">⟳</span>
+      <span class="power-btn" id="pw-shutdown" title="apagar">⏻</span>
+    </div>
+  </div>
+
+  <div id="hint">蒼 + 赫 → 茈</div>
+
+  <script src="field.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,9 +1,39 @@
 #!/usr/bin/env bash
-# 60-session.sh — greetd + tuigreet + paleta del VT + tema de GRUB
-# (system/greetd/, system/vconsole/README.md, system/grub/theme/).
-# Sin autologin — la decisión que tomaste. Todo lo que toca
-# /etc/default/grub vive en esta etapa, para que un solo `grub-mkconfig`
-# al final aplique la paleta del VT y el tema a la vez, no dos pasadas.
+# 60-session.sh — LightDM + tema propio + sesiones Hyprland/XFCE + paleta
+# del VT + tema de GRUB (system/lightdm/, system/vconsole/README.md,
+# system/grub/theme/). Sustituye a greetd+tuigreet: LightDM es más maduro,
+# y el tema aquí es HTML/CSS/JS real con cristal de verdad — ver
+# LIMITLESS-OS.md §2. Todo lo que toca /etc/default/grub vive en esta
+# etapa, para que un solo `grub-mkconfig` al final aplique la paleta del
+# VT y el tema a la vez, no dos pasadas.
+
+_install_lightdm_session() {
+  local src="$REPO_DIR/system/lightdm"
+  local theme_dst="/usr/share/lightdm-webkit/themes/limitless"
+
+  [[ -d "$src/theme" ]] || { echo "no existe $src/theme"; return 1; }
+
+  if ! has_cmd lightdm; then
+    sudo pacman -S --needed --noconfirm lightdm lightdm-webkit2-greeter xfce4 xfce4-terminal || return 1
+  fi
+
+  # el tema (HTML/CSS/JS) — se reemplaza entero en cada corrida, nunca se
+  # mezcla con una versión vieja a medias
+  sudo rm -rf "$theme_dst"
+  sudo mkdir -p "$theme_dst"
+  sudo cp "$src/theme/index.html" "$src/theme/style.css" "$src/theme/field.js" "$src/theme/script.js" "$theme_dst/" || return 1
+
+  sudo install -Dm644 "$src/lightdm-webkit2-greeter.conf" /etc/lightdm/lightdm-webkit2-greeter.conf || return 1
+  sudo install -Dm644 "$src/lightdm.conf.d/50-limitless.conf" /etc/lightdm/lightdm.conf.d/50-limitless.conf || return 1
+
+  # la sesión de Hyprland envuelta en uwsm — uwsm no trae esto de fábrica,
+  # hay que declararla (verificado: "uwsm start -- hyprland.desktop" es la
+  # sintaxis real, contra hyprland.desktop que sí instala el paquete hyprland)
+  sudo install -Dm644 "$src/hyprland-limitless.desktop" /usr/share/wayland-sessions/hyprland-limitless.desktop || return 1
+
+  echo "tema y sesiones de LightDM instalados"
+}
+export -f _install_lightdm_session
 
 _grub_has_vt_palette() {
   grep -q 'vt.default_red=' /etc/default/grub 2>/dev/null
@@ -52,23 +82,12 @@ _apply_vt_palette() {
 export -f _apply_vt_palette
 
 stage_main() {
-  if ! has_cmd greetd; then
-    ui_spin "Instalando greetd + tuigreet" -- sudo pacman -S --needed --noconfirm greetd greetd-tuigreet || return 1
-  fi
+  ui_spin "Instalando LightDM + tema Limitless + sesión XFCE de emergencia" -- _install_lightdm_session || {
+    ui_fail "no se pudo instalar la sesión — revisa system/lightdm/ manualmente"
+    return 1
+  }
 
-  if ! id greeter >/dev/null 2>&1; then
-    ui_spin "Creando el usuario 'greeter'" -- sudo useradd -M -G video greeter || true
-  fi
-
-  local cfg_src="$REPO_DIR/system/greetd/config.toml"
-  if [[ -f "$cfg_src" ]]; then
-    ui_spin "Instalando system/greetd/config.toml" -- \
-      sudo install -Dm644 "$cfg_src" /etc/greetd/config.toml || return 1
-  else
-    ui_warn "no existe $cfg_src"
-  fi
-
-  ui_spin "Habilitando greetd" -- sudo systemctl enable greetd || ui_warn "revisa el servicio a mano"
+  ui_spin "Habilitando LightDM" -- sudo systemctl enable lightdm || ui_warn "revisa el servicio a mano"
 
   # una sola copia de seguridad, antes de la primera de las dos ediciones
   # que siguen (paleta del VT + GRUB_THEME) — no una por cada una
@@ -106,6 +125,6 @@ stage_main() {
       ui_warn "grub-mkconfig falló — revisa /etc/default/grub a mano"
   fi
 
-  ui_ok "sesión configurada — hará falta reiniciar para ver la paleta del VT y el tema de GRUB"
+  ui_ok "sesión configurada — hará falta reiniciar para ver LightDM, la paleta del VT y el tema de GRUB"
   return 0
 }

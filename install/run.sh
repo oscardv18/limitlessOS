@@ -23,7 +23,7 @@ STAGES=(
   "30-services.sh|Servicios"
   "40-stow.sh|Dotfiles"
   "50-theme.sh|Tema"
-  "60-session.sh|Sesión (greetd)"
+  "60-session.sh|Sesión (LightDM)"
   "70-shell.sh|Shell (zsh)"
   "80-tui.sh|Ecosistema TUI"
   "90-verify.sh|Verificación"

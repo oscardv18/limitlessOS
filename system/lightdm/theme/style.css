@@ -1,0 +1,102 @@
+/* system/lightdm/theme/style.css — tema del greeter, mismo sistema de diseño
+   que el resto de Limitless. A diferencia de tuigreet (16 colores ANSI),
+   lightdm-webkit2-greeter renderiza HTML/CSS/JS real sobre WebKitGTK2, que
+   sí soporta backdrop-filter (verificado: la versión webkit1, deprecada,
+   no lo soporta — webkit2 sí). El cristal aquí es cristal de verdad. */
+
+/* @import no bloquea el render — si no hay red todavía en este punto del
+   arranque, cae al monospace del sistema (ver --mono abajo) sin romper nada */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;300;400;500;700&family=Noto+Serif+JP:wght@200;400&display=swap');
+
+:root{
+  --void:#04060d; --surface:rgba(12,18,32,.62); --surface-hi:rgba(16,24,42,.8);
+  --line:rgba(126,168,214,.16); --line-hi:rgba(126,168,214,.32);
+  --lapse:#3b9eff; --lapse-core:#8fe3ff;
+  --hollow:#a970ff; --hollow-core:#e9d5ff;
+  --reversal:#ff4a2e;
+  --text:#eaf2ff; --dim:#7e93b0; --mute:#46587a;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --jp:'Noto Serif JP',serif;
+  --ease:cubic-bezier(.16,.84,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--void);
+  font-family:var(--mono);color:var(--text);}
+canvas#field{position:fixed;inset:0;z-index:0;}
+#veil{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(60% 60% at 50% 38%, rgba(169,112,255,.10), transparent 62%);
+}
+
+#stage{
+  position:relative;z-index:2;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;
+}
+.mark{font-size:11px;letter-spacing:.5em;color:var(--lapse-core);
+  text-shadow:0 0 40px var(--lapse);}
+.time{
+  font-size:88px;font-weight:100;letter-spacing:-.03em;line-height:1;
+  font-variant-numeric:tabular-nums;color:var(--text);
+  text-shadow:0 0 60px rgba(59,158,255,.35);
+}
+.date{font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;}
+
+/* --- el material de cristal, igual que el resto del sistema --- */
+.glass{
+  position:relative;background:
+    linear-gradient(157deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,.018) 34%, rgba(255,255,255,0) 58%, rgba(0,0,0,.10) 100%),
+    var(--surface);
+  -webkit-backdrop-filter: blur(26px) saturate(190%) brightness(1.07);
+  backdrop-filter: blur(26px) saturate(190%) brightness(1.07);
+  border-radius:16px;
+  box-shadow:
+    inset 0 1px 0 0 rgba(255,255,255,.30), inset 0 -1px 0 0 rgba(0,0,0,.45),
+    0 26px 74px rgba(0,0,0,.62);
+}
+
+#panel{width:340px;padding:22px 26px;display:flex;flex-direction:column;gap:14px;margin-top:8px;}
+#panel .who{display:flex;align-items:center;gap:11px;}
+#panel .av{
+  width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid var(--lapse);color:var(--lapse-core);font-family:var(--jp);
+  background:rgba(59,158,255,.12);box-shadow:0 0 22px rgba(59,158,255,.4);
+}
+#panel .uname{font-size:12px;color:var(--text);}
+#panel .host{font-size:9px;color:var(--mute);letter-spacing:.08em;}
+
+#prompt-row{display:none;align-items:center;gap:9px;
+  border-bottom:1px solid var(--line);padding-bottom:9px;}
+#prompt-row.on{display:flex;}
+#prompt-label{font-size:10px;color:var(--dim);white-space:nowrap;}
+#prompt-input{
+  flex:1;background:none;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:13px;letter-spacing:.02em;
+}
+#prompt-input::placeholder{color:var(--mute);}
+
+#msg{font-size:10px;color:var(--dim);min-height:14px;letter-spacing:.02em;}
+#msg.err{color:var(--reversal);}
+#msg.ok{color:var(--lapse-core);}
+
+#sessions{display:flex;gap:6px;flex-wrap:wrap;}
+.sess-chip{
+  font-size:9px;letter-spacing:.08em;padding:5px 10px;border-radius:8px;
+  border:1px solid var(--line);color:var(--dim);cursor:pointer;
+  transition:all .18s var(--ease);
+}
+.sess-chip:hover{border-color:var(--line-hi);color:var(--text);}
+.sess-chip.on{color:var(--void);background:var(--lapse);border-color:var(--lapse);
+  box-shadow:0 0 18px rgba(59,158,255,.45);}
+
+#power{display:flex;gap:16px;justify-content:center;margin-top:4px;}
+.power-btn{
+  font-size:16px;color:var(--dim);cursor:pointer;transition:all .18s var(--ease);
+  width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+  border:1px solid transparent;
+}
+.power-btn:hover{color:var(--reversal);border-color:rgba(255,74,46,.35);
+  background:rgba(255,74,46,.08);}
+
+#hint{position:fixed;bottom:16px;left:0;right:0;text-align:center;
+  font-size:8.5px;letter-spacing:.14em;color:var(--mute);z-index:2;}

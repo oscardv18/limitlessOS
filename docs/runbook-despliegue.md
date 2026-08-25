@@ -1,64 +1,59 @@
-# Runbook — Fase 0: Terreno
+# Runbook — Despliegue
 
-> Procedimiento exacto para ejecutar en la máquina real de CachyOS. Yo no tengo acceso a esa máquina — todo lo de aquí abajo lo corres tú, y me pegas la salida si algo falla.
+> **Este runbook es lo último que se ejecuta, no lo primero.** Sustituye a `runbook-fase-0.md`, cuya premisa ("ejecuta el instalador ahora, en la Fase 0") quedó invalidada: todas las fases de construcción son trabajo sobre el repositorio, nunca sobre una máquina real. `install.sh` se corre **una sola vez**, aquí, cuando el ecosistema completo (Fases 1–6 de `LIMITLESS-OS.md`) ya está terminado y tienes un CachyOS o Arch recién instalado esperando.
+>
+> Si estás leyendo esto y todavía queda construcción pendiente en el repo, para — vuelve cuando `docs/LIMITLESS-OS.md` §6 tenga las seis fases de construcción cerradas.
 
 ---
 
 ## -1. Doble arranque, mismo disco
 
-Dos cosas antes de empezar, porque tu Linux vive junto a este Windows en la misma máquina:
+Dos cosas antes de empezar, porque tu Linux vive junto a Windows en la misma máquina:
 
-**No tengo acceso remoto a tu CachyOS.** No hay SSH entre nosotros — el flujo es: reinicias a Linux, ejecutas los comandos ahí, y vuelves a Windows para traerme el resultado. Cada paso de verificación de este runbook implica ese ir y venir; lo digo aquí para que no te sorprenda a mitad.
+**No tengo acceso remoto a tu CachyOS.** No hay SSH entre nosotros — el flujo es: reinicias a Linux, ejecutas los comandos ahí, y vuelves a Windows para traerme el resultado, o le pides a la instancia de Claude Code (o al enjambre de Gemini/Antigravity) que esté corriendo ahí que lo haga por ti y te reporte.
 
-**Un atajo para no copiar todo a mano:** como es el mismo disco, es muy probable que CachyOS monte tu partición de Windows (NTFS) automáticamente, o que puedas montarla con un `mount` simple. Compruébalo una vez estés en CachyOS con:
+**Un atajo para no copiar todo a mano:** como es el mismo disco, es muy probable que CachyOS monte tu partición de Windows (NTFS) automáticamente, o que puedas montarla con un `mount` simple:
 
 ```bash
 lsblk -f
 findmnt -t ntfs3,ntfs
 ```
 
-Si aparece montada (por ejemplo en `/mnt/windows` o similar — no asumas la ruta, compruébala), puedes volcar los logs ahí desde Linux:
+Si aparece montada, puedes volcar los logs ahí desde Linux y yo los leo directo la próxima vez que arranques Windows, sin transcribir nada.
 
-```bash
-cp ~/.local/state/limitless/install.log /ruta/de/montaje/install.log
-```
-
-y yo lo leo directo la próxima vez que arranques Windows, sin que transcribas nada a mano.
-
-**Sobre el propio GRUB:** revisé el código de `60-session.sh` antes de escribir esto — solo toca `GRUB_THEME` y la paleta de colores del VT en `/etc/default/grub`. Nunca toca `GRUB_DISABLE_OS_PROBER` ni nada que afecte cómo GRUB detecta Windows. Tu entrada de Windows en el menú de arranque sigue ahí, solo hereda el mismo estilo visual que el resto.
+**Sobre GRUB:** `60-session.sh` solo toca `GRUB_THEME` y la paleta de colores del VT en `/etc/default/grub`. Nunca toca `GRUB_DISABLE_OS_PROBER` ni nada que afecte a cómo GRUB detecta Windows.
 
 ---
 
-## 0. Antes de nada: qué vas a instalar realmente
+## 0. Antes de nada: confirma que la construcción está completa
 
-El instalador está organizado **por tipo de cambio** (paquetes, servicios, dotfiles, tema, sesión, shell, TUI, verificación), no por fase de diseño. Eso significa que ejecutar `install.sh` completo hace dos cosas a la vez:
+No es una instalación parcial — la arquitectura completa (`LIMITLESS-OS.md` §2 y §6) debe existir en el repo antes de tocar una máquina real:
 
-1. Cubre por completo la Fase 0 (red de seguridad + `dev/minimal.conf` verificable).
-2. **De paso, adelanta casi toda la Fase 2** — zsh, Neovim, Starship, Ghostty, btop, lazygit, yazi, etc. — porque esas etapas ya están escritas y no tiene sentido separarlas artificialmente.
+- [ ] `hyprland.lua` real existe (no solo `dev/minimal.conf`)
+- [ ] QuickShell: los `.qml` de barra, dock, launcher, notificaciones, OSD existen
+- [ ] `system/lightdm/` con el tema `lightdm-webkit2-greeter` adaptado del mockup
+- [ ] `packages/pacman.txt` incluye `lightdm`, `lightdm-webkit2-greeter`, `xfce4`, `xfce4-terminal`, `obs-studio`
+- [ ] `docs/spec-keybinds.md` §4b (teclas de función) y §4c (OBS/pantalla compartida) están aplicadas en `hyprland.lua`, no solo documentadas
+- [ ] `dotctl doctor` corre localmente sin errores de sintaxis (`bash -n` sobre todo `install/`, `qmllint` sobre todo `.qml`)
 
-Lo que **no** instala todavía, porque no existe como código: `hyprland.lua` real (hoy solo está `dev/minimal.conf`, el de rescate) y el shell de QuickShell. Eso es la Fase 1 y la Fase 4, y vienen después.
-
-Nada de esto es irreversible sin salida: la etapa `00-preflight` crea una instantánea Btrfs **antes** de tocar cualquier paquete, y cada etapa posterior es idempotente — puedes parar, reiniciar, y volver a correr `./install.sh` sin duplicar trabajo.
+Si algo de esto falta, este no es el momento de instalar — vuelve a la fase de construcción correspondiente.
 
 ---
 
 ## 1. Pre-vuelo (2 minutos)
 
-Desde la sesión actual en tu CachyOS (TTY o lo que estés usando ahora):
+Con el CachyOS/Arch recién instalado, desde una sesión con red:
 
 ```bash
-# confirma dónde estás parado — debería decir btrfs, ya lo verificamos antes
-findmnt -no FSTYPE /
-
-# confirma que tienes red
-ping -c1 archlinux.org
+findmnt -no FSTYPE /       # confirma btrfs
+ping -c1 archlinux.org     # confirma red
 ```
 
-Si el sistema de archivos no dice `btrfs`, para aquí y avísame — cambia la Capa 2 de la red de seguridad (`LIMITLESS-OS.md` §1, Capa 2b) y hay que ajustar el plan antes de seguir.
+Si el sistema de archivos no dice `btrfs`, para y avísame — cambia la Capa 2 de la red de seguridad (`LIMITLESS-OS.md` §1, Capa 2b).
 
 ---
 
-## 2. Clonar y ejecutar
+## 2. Clonar y ejecutar — la única vez que esto corre
 
 ```bash
 git clone https://github.com/<tu-usuario>/<tu-repo>.git ~/.limitless
@@ -66,60 +61,63 @@ cd ~/.limitless
 ./install.sh
 ```
 
-Qué vas a ver: `install.sh` instala `gum` si falta (único paso fuera de una etapa numerada), y después el banner de bienvenida con una confirmación. Contesta que sí y las 10 etapas corren en orden, cada una con su spinner y su resultado.
+Orden exacto de lo que va a pasar, y por qué en ese orden (`LIMITLESS-OS.md` §5.3):
 
-**Si algo falla a mitad:** el instalador pregunta si quieres continuar con la siguiente etapa. Di que sí salvo que el fallo te preocupe — cada etapa es independiente y una etapa AUR rota (§ etapa 20) nunca debe frenar el resto.
+1. `install.sh` instala `gum` si falta — único paso fuera de una etapa numerada.
+2. Banner de bienvenida + confirmación.
+3. **Pide tu contraseña de `sudo` una vez** (`sudo_keepalive_start`, antes de la primera etapa) y la mantiene viva mientras corren las etapas largas — no te la vuelve a pedir a mitad.
+4. `00-preflight`: red de seguridad Btrfs + **Plymouth fuera** (causa documentada del cuelgue que ya viviste).
+5. `10-core`: paquetes oficiales, pacman puro — funciona igual en CachyOS que en cualquier Arch.
+6. `20-aur`: `paru` + AUR. Un paquete que falla no frena el resto.
+7. `30-services` → `40-stow` → `50-theme` → `60-session` (LightDM + XFCE + Hyprland) → `70-shell` → `80-tui` → `90-verify`.
 
-**Si quieres parar y reanudar más tarde:**
+**Si algo falla a mitad:** el instalador pregunta si quieres continuar. Di que sí salvo que el fallo te preocupe.
 
-```bash
-./install.sh --from=NN   # NN = el número de la etapa donde quieres retomar
-```
-
-(las etapas ya completadas antes de esa NN no se repiten; consulta `install/stages/` para los números)
+**Para parar y reanudar:** `./install.sh --from=NN` (número de etapa en `install/stages/`).
 
 ---
 
 ## 3. Qué reportarme al terminar
 
-Pégame la salida de esto, sea cual sea el resultado:
-
 ```bash
 cat ~/.local/state/limitless/install.log | tail -80
 ```
 
-Y si `dotctl doctor` (la última etapa lo ejecuta sola) marcó algún fallo o aviso, dime cuáles — la mayoría se resuelven con un `paru -S <paquete>` suelto, pero prefiero verlos antes de que asumas que son inofensivos.
+Y el resultado de `dotctl doctor` (la última etapa lo corre sola) — dime cualquier fallo o aviso antes de asumir que es inofensivo.
 
 ---
 
-## 4. Los dos criterios de cierre de la Fase 0
-
-No des la Fase 0 por terminada hasta comprobar esto — **reinicia primero**:
+## 4. Criterios de cierre — reinicia primero
 
 ### 4.1 El submenú de instantáneas en GRUB
 
-Al arrancar, antes de que cargue el sistema, deberías ver el menú de GRUB con la paleta Limitless (si `60-session` corrió bien) y una entrada **«Arch Linux snapshots»**. Entra ahí y confirma que aparece al menos una instantánea con la descripción `limitless: preflight`.
+Debe verse con la paleta Limitless y una entrada **«Arch Linux snapshots»**, con al menos una instantánea `limitless: preflight`.
 
-Si no aparece el submenú: `sudo systemctl status grub-btrfsd` y pégame la salida.
+Si no aparece: `sudo systemctl status grub-btrfsd`.
 
-### 4.2 `dev/minimal.conf` arranca de verdad
+### 4.2 LightDM arranca, con el tema
 
-Desde un TTY (`Ctrl+Alt+F2` si estás en una sesión gráfica, o directamente si sigues en consola):
+Deberías ver el greeter tematizado (cristal, campo de colisión, la paleta), con dos sesiones para elegir: **Hyprland Limitless** y **XFCE**.
+
+Si en vez de eso ves una pantalla en blanco, gris, o LightDM no aparece: `journalctl -u lightdm -b --no-pager | tail -60` y pégamelo — es exactamente el tipo de fallo silencioso que ya tuvimos con Plymouth, así que quiero verlo antes de suponer nada.
+
+### 4.3 Ambas sesiones arrancan
+
+Prueba las dos, en este orden:
+
+1. **Hyprland Limitless** — el sistema completo: barra, dock, launcher, cristal, tu paleta. Si algo no coincide con el mockup, dime específicamente qué.
+2. **XFCE** — la red de emergencia. Solo confirma que arranca; no hace falta que la uses.
+
+### 4.4 `Ctrl+Alt+F2` → `dev/minimal.conf`, el último respaldo
 
 ```bash
 Hyprland -c ~/.limitless/dev/minimal.conf
 ```
 
-Debería abrir un compositor sin adornos —sin blur, sin animaciones, gaps mínimos— con un terminal ya abierto (`ghostty`, o su respaldo si `ghostty` no está). Prueba `SUPER+RETURN` para otro terminal y `SUPER+SHIFT+E` para salir.
-
-**Si esto arranca:** la Fase 0 está cerrada. Cualquier fallo futuro del shell real (Fase 1 en adelante) será de tu configuración, no del sistema — el diagnóstico de 30 segundos que se buscaba desde el principio.
-
-**Si esto NO arranca:** el problema es del sistema base, no de una config. En ese caso:
-1. `journalctl -b -p err | tail -40` y pégamelo.
-2. Como último recurso, reinicia y entra a la instantánea anterior desde el submenú de GRUB del paso 4.1.
+Si el shell completo alguna vez falla, este archivo de 30 líneas sin adornos debe arrancar igual. Es el diagnóstico de 30 segundos: si esto arranca, el problema es tu configuración, no el sistema.
 
 ---
 
-## 5. Cuando ambos criterios pasen
+## 5. Cuando todo pase
 
-Dímelo y arrancamos la Fase 1: `hyprland.lua` de verdad, bloque a bloque — el primer archivo Lua real del proyecto, y el único punto donde voy a verificar la sintaxis de Hyprland 0.56 línea a línea contra el wiki en vivo antes de escribir nada, en vez de reutilizar lo que ya sé de memoria (que es exactamente lo que hice con `minimal.conf`, y por lo que ese archivo se quedó en hyprlang).
+El sistema está desplegado. A partir de aquí, cualquier cambio vuelve a ser trabajo de construcción en el repo — nunca se reinstala desde cero para iterar, se usa `dotctl update` (`plan-automation.md` §6) sobre el sistema ya desplegado.
