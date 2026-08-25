@@ -143,7 +143,8 @@ jobs:
           # Are your import paths set up properly?" en los 22 archivos).
           sudo apt-get install -y -qq \
             qt6-declarative-dev-tools qt6-base-dev qt6-declarative-dev \
-            qml6-module-qtquick qml6-module-qtquick-layouts
+            qml6-module-qtquick qml6-module-qtquick-layouts \
+            qml6-module-qtquick-controls
 
       - name: Ejecutar qmllint sobre archivos QML
         if: steps.check-qml.outputs.count > 0
