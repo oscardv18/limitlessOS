@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# dot:summary=Cambia la técnica de color activa en todo el sistema
+# dot:group=sistema
+# dot:glyph=◐
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# SUPER+T (spec-keybinds.md §3.1). Esto es la promesa de LIMITLESS-OS.md
+# §4.4 — "pulsar T recolorea el sistema entero sin reiniciar nada" — así
+# que tiene que mover DOS mundos a la vez:
+#
+#   1. QuickShell, en caliente, por IPC (Theme.qml mantiene la técnica
+#      activa en memoria; no toca disco).
+#   2. Todo lo demás (Ghostty, btop, yazi, GTK, Qt…), regenerando los
+#      archivos de tema con matugen a partir de theme.toml.
+#
+# El (2) es más lento y no todas las apps recargan solas — por eso el (1)
+# va primero: el shell cambia al instante y el resto alcanza en un segundo.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_fail() { echo "  [ERR] $1" >&2; }
+  ui_info() { echo "  [INFO] $1"; }
+fi
+
+TECHNIQUES=(lapse hollow reversal)
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/limitless"
+STATE_FILE="$STATE_DIR/technique"
+mkdir -p "$STATE_DIR"
+
+_current() {
+  if [[ -f "$STATE_FILE" ]]; then
+    cat "$STATE_FILE" 2>/dev/null
+  else
+    # por defecto, lo que diga theme.toml — no un valor inventado aquí
+    grep -m1 '^technique_default' "$REPO_DIR/themes/hud-void/theme.toml" 2>/dev/null \
+      | sed -e 's/.*=[[:space:]]*"//' -e 's/".*//' || echo "lapse"
+  fi
+}
+
+_valid() {
+  local want="$1" t
+  for t in "${TECHNIQUES[@]}"; do [[ "$t" == "$want" ]] && return 0; done
+  return 1
+}
+
+_apply() {
+  local technique="$1"
+  echo "$technique" >"$STATE_FILE"
+
+  # (1) el shell, al instante
+  if command -v qs >/dev/null 2>&1; then
+    qs -c limitless ipc call theme set "$technique" >/dev/null 2>&1 || \
+      ui_info "el shell no respondió al IPC (¿no está corriendo?)"
+  fi
+
+  # (2) el resto del ecosistema, vía matugen
+  if command -v matugen >/dev/null 2>&1 && [[ -x "$REPO_DIR/bin/cmd/theme-export" ]]; then
+    LIMITLESS_TECHNIQUE="$technique" "$REPO_DIR/bin/cmd/theme-export" >/dev/null 2>&1 || \
+      ui_info "theme-export falló — el shell ya cambió, el resto no"
+    matugen --config "$REPO_DIR/themes/matugen.toml" color hex "#04060d" >/dev/null 2>&1 || \
+      ui_info "matugen falló — revisa themes/matugen.toml"
+    command -v bat >/dev/null 2>&1 && bat cache --build >/dev/null 2>&1 || true
+  fi
+
+  # (3) recargas en caliente que sí son posibles
+  command -v hyprctl >/dev/null 2>&1 && hyprctl reload >/dev/null 2>&1 || true
+
+  local kanji
+  case "$technique" in
+    lapse)    kanji="蒼" ;;
+    hollow)   kanji="茈" ;;
+    reversal) kanji="赫" ;;
+  esac
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -a "Limitless" "$kanji TÉCNICA" "$technique — paleta propagada" -t 1600 2>/dev/null || true
+
+  ui_ok "técnica: $technique"
+}
+
+action="${1:-cycle}"
+
+case "$action" in
+  cycle)
+    cur="$(_current)"
+    idx=0
+    for i in "${!TECHNIQUES[@]}"; do
+      [[ "${TECHNIQUES[$i]}" == "$cur" ]] && idx=$i && break
+    done
+    _apply "${TECHNIQUES[$(( (idx + 1) % ${#TECHNIQUES[@]} ))]}"
+    ;;
+  set)
+    want="${2:-}"
+    if _valid "$want"; then
+      _apply "$want"
+    else
+      ui_fail "técnica desconocida: $want"
+      echo "disponibles: ${TECHNIQUES[*]}" >&2
+      exit 1
+    fi
+    ;;
+  current)
+    _current
+    ;;
+  list)
+    printf '%s\n' "${TECHNIQUES[@]}"
+    ;;
+  -h|--help)
+    echo "uso: dotctl theme <cycle | set <técnica> | current | list>"
+    echo
+    echo "técnicas: 蒼 lapse · 茈 hollow · 赫 reversal"
+    ;;
+  *)
+    ui_fail "acción desconocida: $action"
+    exit 1
+    ;;
+esac

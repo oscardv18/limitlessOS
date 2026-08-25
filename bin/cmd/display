@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# dot:summary=Cicla perfiles de pantalla (solo portátil, extender, espejo, solo externa)
+# dot:group=sistema
+# dot:glyph=▭
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# Tecla XF86Display, la del icono de pantalla del portátil (spec-keybinds.md
+# §4b). Ciclo de cuatro perfiles, el orden que espera cualquiera que haya
+# usado un proyector: interna → extender → espejo → solo externa → interna.
+#
+# Los monitores NO están cableados a mano: se descubren con `hyprctl
+# monitors -j` en cada invocación. Un portátil que hoy tiene HDMI-A-1 y
+# mañana DP-2 funciona igual sin tocar este archivo.
+
+set -uo pipefail
+
+PROFILES=(interna extender espejo externa)
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/limitless"
+STATE_FILE="$STATE_DIR/display"
+mkdir -p "$STATE_DIR"
+
+# El chequeo de hyprctl NO va aquí arriba: `list` y `--help` son consultas
+# puras y deben funcionar desde cualquier sitio (un TTY de rescate, otra
+# máquina). Solo _apply() necesita el compositor vivo.
+_need_hyprctl() {
+  command -v hyprctl >/dev/null 2>&1 || { echo "  [ERR] hyprctl no disponible" >&2; exit 1; }
+}
+
+# La pantalla interna de un portátil se llama eDP-N o LVDS-N por convención
+# del kernel (DRM). Todo lo demás es externo.
+_internal() {
+  if command -v jq >/dev/null 2>&1; then
+    hyprctl monitors -j | jq -r '[.[] | select(.name | test("^(eDP|LVDS)"))][0].name // empty'
+  else
+    hyprctl monitors | grep -oE '^Monitor (eDP|LVDS)[^ ]*' | head -1 | awk '{print $2}'
+  fi
+}
+
+_externals() {
+  if command -v jq >/dev/null 2>&1; then
+    hyprctl monitors -j | jq -r '.[] | select(.name | test("^(eDP|LVDS)") | not) | .name'
+  else
+    hyprctl monitors | grep -oE '^Monitor [^ ]+' | awk '{print $2}' | grep -vE '^(eDP|LVDS)'
+  fi
+}
+
+_notify() {
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -a "Limitless" "▭ PANTALLAS" "$1" -t 1600 2>/dev/null || true
+}
+
+_apply() {
+  _need_hyprctl
+  local idx="$1" profile="${PROFILES[$1]}"
+  local internal ext_list
+  internal="$(_internal)"
+  mapfile -t ext_list < <(_externals)
+
+  if (( ${#ext_list[@]} == 0 )) && [[ "$profile" != "interna" ]]; then
+    _notify "No hay pantalla externa conectada"
+    return 0
+  fi
+
+  case "$profile" in
+    interna)
+      for e in "${ext_list[@]}"; do
+        hyprctl keyword monitor "$e,disable" >/dev/null 2>&1 || true
+      done
+      [[ -n "$internal" ]] && hyprctl keyword monitor "$internal,preferred,auto,1" >/dev/null 2>&1 || true
+      ;;
+    extender)
+      [[ -n "$internal" ]] && hyprctl keyword monitor "$internal,preferred,auto,1" >/dev/null 2>&1 || true
+      for e in "${ext_list[@]}"; do
+        hyprctl keyword monitor "$e,preferred,auto,1" >/dev/null 2>&1 || true
+      done
+      ;;
+    espejo)
+      # `mirror` toma el nombre del monitor a duplicar como último campo
+      [[ -n "$internal" ]] || { _notify "Sin pantalla interna que duplicar"; return 0; }
+      hyprctl keyword monitor "$internal,preferred,auto,1" >/dev/null 2>&1 || true
+      for e in "${ext_list[@]}"; do
+        hyprctl keyword monitor "$e,preferred,auto,1,mirror,$internal" >/dev/null 2>&1 || true
+      done
+      ;;
+    externa)
+      for e in "${ext_list[@]}"; do
+        hyprctl keyword monitor "$e,preferred,auto,1" >/dev/null 2>&1 || true
+      done
+      # la interna se apaga la ÚLTIMA: apagarla primero dejaría la sesión
+      # sin ninguna salida activa por un instante, y Hyprland puede mover
+      # todos los workspaces a un sitio inesperado.
+      [[ -n "$internal" ]] && hyprctl keyword monitor "$internal,disable" >/dev/null 2>&1 || true
+      ;;
+  esac
+
+  echo "$idx" >"$STATE_FILE"
+  _notify "Perfil: $profile"
+}
+
+action="${1:-cycle}"
+
+case "$action" in
+  cycle)
+    cur=0
+    [[ -f "$STATE_FILE" ]] && cur="$(cat "$STATE_FILE" 2>/dev/null || echo 0)"
+    [[ "$cur" =~ ^[0-9]+$ ]] || cur=0
+    _apply $(( (cur + 1) % ${#PROFILES[@]} ))
+    ;;
+  set)
+    want="${2:-}"
+    for i in "${!PROFILES[@]}"; do
+      [[ "${PROFILES[$i]}" == "$want" ]] && { _apply "$i"; exit 0; }
+    done
+    echo "  [ERR] perfil desconocido: $want (${PROFILES[*]})" >&2
+    exit 1
+    ;;
+  list)
+    printf '%s\n' "${PROFILES[@]}"
+    ;;
+  -h|--help)
+    echo "uso: dotctl display <cycle | set <perfil> | list>"
+    echo
+    echo "perfiles: ${PROFILES[*]}"
+    ;;
+  *)
+    echo "  [ERR] acción desconocida: $action" >&2
+    exit 1
+    ;;
+esac

@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# dot:summary=Actualiza el sistema y los dotfiles con instantánea previa
+# dot:group=sistema
+# dot:glyph=⟳
+# dot:requires-sudo=true
+# dot:terminal=true
+#
+# plan-automation.md §6, la secuencia completa y en ESE orden:
+#   flock → espacio en disco → snapshot → git pull → restow → migrate
+#   → pacman/AUR → hyprpm → recargas → log
+#
+# El orden no es arbitrario, y dos pasos merecen explicación:
+#
+#   · El SNAPSHOT va antes de tocar nada. Es el paso que convierte "rompí
+#     el sistema" en "reinicio y elijo el de antes". Si falla, se pregunta
+#     antes de seguir en vez de continuar a ciegas.
+#   · Las MIGRACIONES van DESPUÉS del restow y ANTES de pacman: una
+#     migración típica limpia residuos de una config que acaba de cambiar
+#     de forma, y algunas quitan paquetes que pacman reinstalaría si
+#     corrieran al revés.
+#
+# hyprpm al final y por separado: los plugins se compilan contra la
+# versión exacta de Hyprland, así que hay que actualizarlos DESPUÉS de
+# que pacman haya traído el compositor nuevo — si no, arranca sin ellos.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_fail() { echo "  [ERR] $1" >&2; }
+  ui_warn() { echo "  [WARN] $1"; }
+  ui_info() { echo "  [INFO] $1"; }
+  ui_confirm() { read -rp "$1 [s/N] " r; [[ "$r" == [sS]* ]]; }
+fi
+
+LOG="/tmp/dotctl-update.log"
+LOCK="/tmp/dotctl-update.lock"
+
+has_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# ── flock: dos actualizaciones a la vez son una forma creativa de
+#    corromper la base de datos de pacman ──────────────────────────────
+exec 9>"$LOCK"
+if ! flock -n 9; then
+  ui_fail "ya hay una actualización en curso (lock: $LOCK)"
+  exit 1
+fi
+
+exec > >(tee -a "$LOG") 2>&1
+echo "──────── dotctl update · $(date '+%Y-%m-%d %H:%M:%S') ────────"
+
+# ── 1. espacio ────────────────────────────────────────────────────────
+free_gb="$(df --output=avail -BG / 2>/dev/null | tail -1 | tr -dc '0-9')"
+if [[ -n "$free_gb" ]] && (( free_gb < 5 )); then
+  ui_warn "solo quedan ${free_gb}G libres en /"
+  ui_confirm "¿Continuar de todos modos?" || exit 1
+else
+  ui_ok "espacio libre: ${free_gb:-?}G"
+fi
+
+# ── 2. instantánea ────────────────────────────────────────────────────
+if has_cmd snapper && [[ "$(findmnt -no FSTYPE / 2>/dev/null)" == "btrfs" ]]; then
+  if sudo snapper -c root create -d "pre dotctl update $(date '+%F %T')" 2>/dev/null; then
+    ui_ok "instantánea creada"
+  else
+    ui_warn "no se pudo crear la instantánea"
+    ui_confirm "¿Seguir SIN red de seguridad?" || exit 1
+  fi
+else
+  ui_info "sin snapper/btrfs — se omite la instantánea (LIMITLESS-OS.md §1, capa 2b)"
+fi
+
+# ── 3. git pull ───────────────────────────────────────────────────────
+if git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  if [[ -n "$(git -C "$REPO_DIR" status --porcelain)" ]]; then
+    ui_warn "hay cambios locales sin commitear en $REPO_DIR"
+    ui_info "se omite el pull para no pisarlos; commitéalos o guárdalos con git stash"
+  else
+    if git -C "$REPO_DIR" pull --ff-only 2>&1; then
+      ui_ok "repositorio actualizado"
+    else
+      ui_warn "git pull falló (¿historia divergente?) — se sigue con lo que hay en disco"
+    fi
+  fi
+fi
+
+# ── 4. restow ─────────────────────────────────────────────────────────
+if has_cmd stow; then
+  for d in "$REPO_DIR"/stow/*/; do
+    [[ -d "$d" ]] || continue
+    p="$(basename "$d")"
+    stow -R -d "$REPO_DIR/stow" -t "$HOME" "$p" 2>/dev/null || \
+      ui_warn "stow -R falló en '$p' (¿conflicto con un archivo existente?)"
+  done
+  ui_ok "enlaces reaplicados"
+fi
+
+# ── 5. migraciones ────────────────────────────────────────────────────
+if [[ -x "$REPO_DIR/bin/cmd/migrate" ]]; then
+  "$REPO_DIR/bin/cmd/migrate" run || ui_warn "alguna migración falló — revisa arriba"
+fi
+
+# ── 6. paquetes ───────────────────────────────────────────────────────
+if has_cmd paru; then
+  paru -Syu --noconfirm || ui_warn "la actualización de paquetes terminó con errores"
+elif has_cmd yay; then
+  yay -Syu --noconfirm || ui_warn "la actualización de paquetes terminó con errores"
+else
+  sudo pacman -Syu --noconfirm || ui_warn "pacman terminó con errores"
+fi
+
+# huérfanos: solo se listan. Borrar paquetes automáticamente en una
+# actualización desatendida es cómo se pierde algo que sí hacía falta.
+orphans="$(pacman -Qtdq 2>/dev/null || true)"
+if [[ -n "$orphans" ]]; then
+  ui_info "paquetes huérfanos (revísalos): $(echo "$orphans" | tr '\n' ' ')"
+  ui_info "para quitarlos:  sudo pacman -Rns \$(pacman -Qtdq)"
+fi
+
+# ── 7. plugins de Hyprland ────────────────────────────────────────────
+if has_cmd hyprpm; then
+  hyprpm update 2>&1 && ui_ok "plugins de Hyprland recompilados" || \
+    ui_warn "hyprpm update falló — Hyprland puede arrancar sin plugins"
+fi
+
+# ── 8. tema y recargas en caliente ────────────────────────────────────
+[[ -x "$REPO_DIR/bin/cmd/theme-export" ]] && "$REPO_DIR/bin/cmd/theme-export" >/dev/null 2>&1 || true
+if has_cmd matugen && compgen -G "$REPO_DIR/themes/_templates/*.tmpl" >/dev/null 2>&1; then
+  matugen --config "$REPO_DIR/themes/matugen.toml" color hex "#04060d" >/dev/null 2>&1 || true
+  has_cmd bat && bat cache --build >/dev/null 2>&1 || true
+fi
+has_cmd hyprctl && hyprctl reload >/dev/null 2>&1 || true
+
+ui_ok "actualización completa · log en $LOG"
+ui_info "si algo quedó raro: reinicia y elige la instantánea anterior en GRUB"

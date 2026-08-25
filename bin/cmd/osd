@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# dot:summary=Muestra el indicador flotante de volumen o brillo
+# dot:group=shell
+# dot:glyph=◨
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# Emisor del OSD. El receptor es modules/OSD.qml, cuyo contrato IPC está
+# declarado en su propia cabecera:
+#     target "osd", function show(kind: string, value: int): void
+#
+# Lo invocan las teclas multimedia de lua/keybinds.lua DESPUÉS de cambiar
+# el valor real — este script no cambia volumen ni brillo, solo lee el
+# estado actual y lo pinta. Separar "cambiar" de "mostrar" evita que el
+# OSD y el sistema se desincronicen.
+
+set -uo pipefail
+
+kind="${1:-vol}"
+
+_read_volume() {
+  command -v wpctl >/dev/null 2>&1 || return 1
+  local raw
+  raw="$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)" || return 1
+  # "Volume: 0.60" → 60 · "Volume: 0.60 [MUTED]" → 0
+  if [[ "$raw" == *MUTED* ]]; then
+    echo 0
+    return 0
+  fi
+  echo "$raw" | awk '{printf "%d", $2 * 100}'
+}
+
+_read_mic() {
+  command -v wpctl >/dev/null 2>&1 || return 1
+  local raw
+  raw="$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null)" || return 1
+  [[ "$raw" == *MUTED* ]] && { echo 0; return 0; }
+  echo "$raw" | awk '{printf "%d", $2 * 100}'
+}
+
+_read_brightness() {
+  command -v brightnessctl >/dev/null 2>&1 || return 1
+  local cur max
+  cur="$(brightnessctl get 2>/dev/null)" || return 1
+  max="$(brightnessctl max 2>/dev/null)" || return 1
+  [[ "${max:-0}" -gt 0 ]] || return 1
+  awk -v c="$cur" -v m="$max" 'BEGIN { printf "%d", (c / m) * 100 }'
+}
+
+case "$kind" in
+  vol|volume)  value="$(_read_volume)"     || exit 0; kind="vol" ;;
+  mic)         value="$(_read_mic)"        || exit 0 ;;
+  bri|brightness) value="$(_read_brightness)" || exit 0; kind="bri" ;;
+  -h|--help)
+    echo "uso: dotctl osd <vol|mic|bri>"
+    echo
+    echo "Lee el valor actual y lo muestra en el OSD del shell."
+    echo "No cambia nada — eso lo hacen wpctl/brightnessctl desde el keybind."
+    exit 0
+    ;;
+  *)
+    echo "  [ERR] tipo desconocido: $kind (usa vol, mic o bri)" >&2
+    exit 1
+    ;;
+esac
+
+[[ -n "${value:-}" ]] || exit 0
+
+command -v qs >/dev/null 2>&1 || exit 0
+qs -c limitless ipc call osd show "$kind" "$value" >/dev/null 2>&1 || true

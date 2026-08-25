@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# dot:summary=Captura pantalla: región, ventana, pantalla completa o grabación
+# dot:group=sistema
+# dot:glyph=✚
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# SUPER+SHIFT+S y la tecla Impr Pant (spec-keybinds.md §3.1 y §3.3).
+# Cadena: grim (captura) → slurp (selección) → satty (anotación) → wl-copy.
+# Los cuatro ya están en packages/pacman.txt.
+#
+# Todo va también al portapapeles, no solo a disco: la mitad de las veces
+# una captura es para pegarla, no para guardarla.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_fail() { echo "  [ERR] $1" >&2; }
+fi
+
+OUT_DIR="${XDG_PICTURES_DIR:-$HOME/Imágenes}/capturas"
+mkdir -p "$OUT_DIR"
+stamp="$(date '+%Y-%m-%d_%H-%M-%S')"
+out="$OUT_DIR/limitless_$stamp.png"
+
+_need() {
+  command -v "$1" >/dev/null 2>&1 || { ui_fail "falta '$1' — está en packages/pacman.txt"; exit 1; }
+}
+
+_notify() {
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -a "Limitless" "⬚ CAPTURA" "$1" 2>/dev/null || true
+}
+
+mode="${1:-region}"
+
+case "$mode" in
+  region)
+    _need grim; _need slurp
+    geom="$(slurp 2>/dev/null)" || exit 0   # Esc en slurp = cancelar, no error
+    [[ -n "$geom" ]] || exit 0
+    grim -g "$geom" "$out" || { ui_fail "grim falló"; exit 1; }
+    ;;
+  window)
+    _need grim; _need slurp
+    # las ventanas se sacan de Hyprland y se pasan a slurp como candidatas
+    if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+      geom="$(hyprctl clients -j | jq -r '.[] | select(.workspace.id > 0) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' | slurp -r 2>/dev/null)" || exit 0
+    else
+      geom="$(slurp 2>/dev/null)" || exit 0
+    fi
+    [[ -n "$geom" ]] || exit 0
+    grim -g "$geom" "$out" || { ui_fail "grim falló"; exit 1; }
+    ;;
+  screen|full)
+    _need grim
+    grim "$out" || { ui_fail "grim falló"; exit 1; }
+    ;;
+  record)
+    _need wf-recorder; _need slurp
+    if pidof wf-recorder >/dev/null 2>&1; then
+      pkill -INT -x wf-recorder
+      _notify "Grabación detenida"
+      exit 0
+    fi
+    geom="$(slurp 2>/dev/null)" || exit 0
+    [[ -n "$geom" ]] || exit 0
+    vid="$OUT_DIR/limitless_$stamp.mp4"
+    _notify "Grabando — repite el atajo para detener"
+    exec wf-recorder -g "$geom" -f "$vid"
+    ;;
+  -h|--help)
+    echo "uso: dotctl capture <region|window|screen|record>"
+    echo
+    echo "region  selección con el ratón (por defecto)"
+    echo "window  elegir una ventana"
+    echo "screen  pantalla completa"
+    echo "record  graba una región a mp4; repetir para detener"
+    echo
+    echo "Todas las capturas van a $OUT_DIR y al portapapeles."
+    exit 0
+    ;;
+  *)
+    ui_fail "modo desconocido: $mode"
+    exit 1
+    ;;
+esac
+
+# anotación opcional — si satty está, se abre; si no, la captura ya es válida
+if command -v satty >/dev/null 2>&1; then
+  satty --filename "$out" --output-filename "$out" --early-exit --copy-command wl-copy 2>/dev/null || true
+elif command -v wl-copy >/dev/null 2>&1; then
+  wl-copy < "$out"
+fi
+
+_notify "Guardada en $(basename "$out") · copiada al portapapeles"

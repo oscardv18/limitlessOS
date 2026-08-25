@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# dot:summary=Publica el estado de los agentes de herdr en la barra del HUD
+# dot:group=shell
+# dot:glyph=⑂
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# LIMITLESS-OS.md §4.1 — la integración más original del proyecto: un agente
+# que se bloquea enciende un punto rojo en la barra AUNQUE su terminal esté
+# en otro workspace. Dejas de tener que mirar si el agente terminó.
+#
+# ── protocolo, verificado contra herdr.dev/docs/socket-api/ ──────────────
+# Socket UNIX con JSON delimitado por saltos de línea. Resolución de ruta,
+# en este orden: $HERDR_SOCKET_PATH → ~/.config/herdr/herdr.sock
+# Petición:  {"id":"...","method":"agent.list","params":{}}
+# Respuesta: {"id":"...","result":{...}}  |  {"id":"...","error":{...}}
+#
+# ── estados reales, y una corrección a la documentación del proyecto ─────
+# LIMITLESS-OS.md §4.1 asumió CUATRO estados. La API real expone CINCO:
+#   idle, working, blocked, done, unknown
+# El quinto (`unknown`) no estaba contemplado. Se pinta como `idle` —
+# ruido de fondo — porque un estado que el detector no supo clasificar no
+# merece reclamar atención. Queda anotado aquí y en §4.1.
+#
+# ── por qué el parseo es defensivo ───────────────────────────────────────
+# La documentación pública describe los CAMPOS de PaneInfo (incluido
+# `agent_status`) pero no publica un payload de ejemplo de `agent.list`,
+# así que la forma exacta del envoltorio (¿.result.agents? ¿.result.panes?)
+# no está confirmada. En vez de adivinar una ruta concreta de jq, se
+# buscan recursivamente TODOS los `agent_status` del documento — funciona
+# con cualquiera de las formas posibles. Si herdr cambia el nombre del
+# campo, esto devuelve cero agentes en vez de romperse.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+
+SOCKET="${HERDR_SOCKET_PATH:-$HOME/.config/herdr/herdr.sock}"
+INTERVAL="${LIMITLESS_HERDR_INTERVAL:-2}"
+QS_CONFIG="limitless"
+
+_die() { echo "  [ERR] $1" >&2; exit 1; }
+
+_query() {
+  # una petición, una respuesta, sin sesión persistente: herdr puede
+  # reiniciarse entre sondeos y no queremos arrastrar un socket muerto.
+  printf '{"id":"limitless","method":"agent.list","params":{}}\n' \
+    | timeout 2 socat - "UNIX-CONNECT:$SOCKET" 2>/dev/null | head -1
+}
+
+# JSON → "blocked working done idle" (conteos), vía jq recursivo
+_counts_from_json() {
+  jq -r '
+    [.. | objects | .agent_status? // empty | ascii_downcase]
+    | {
+        blocked: ([.[] | select(. == "blocked")] | length),
+        working: ([.[] | select(. == "working")] | length),
+        done:    ([.[] | select(. == "done")]    | length),
+        idle:    ([.[] | select(. == "idle" or . == "unknown")] | length)
+      }
+    | "\(.blocked) \(.working) \(.done) \(.idle)"
+  ' 2>/dev/null
+}
+
+_publish() {
+  local blocked="$1" working="$2" done_="$3" idle="$4"
+  command -v qs >/dev/null 2>&1 || return 0
+  qs -c "$QS_CONFIG" ipc call herdr setCounts \
+    "$blocked" "$working" "$done_" "$idle" >/dev/null 2>&1 || true
+}
+
+_once() {
+  local raw counts
+  if [[ ! -S "$SOCKET" ]]; then
+    _publish 0 0 0 0
+    return 0
+  fi
+  raw="$(_query)"
+  [[ -n "$raw" ]] || { _publish 0 0 0 0; return 0; }
+  counts="$(printf '%s' "$raw" | _counts_from_json)"
+  [[ -n "$counts" ]] || { _publish 0 0 0 0; return 0; }
+  # shellcheck disable=SC2086
+  _publish $counts
+}
+
+case "${1:-watch}" in
+  once)
+    command -v socat >/dev/null 2>&1 || _die "falta 'socat' (packages/pacman.txt)"
+    command -v jq    >/dev/null 2>&1 || _die "falta 'jq' (packages/pacman.txt)"
+    _once
+    ;;
+  status)
+    # depuración: imprime el conteo en vez de publicarlo
+    command -v socat >/dev/null 2>&1 || _die "falta 'socat'"
+    command -v jq    >/dev/null 2>&1 || _die "falta 'jq'"
+    [[ -S "$SOCKET" ]] || _die "no hay socket de herdr en $SOCKET"
+    raw="$(_query)"
+    [[ -n "$raw" ]] || _die "herdr no respondió"
+    read -r b w d i <<<"$(printf '%s' "$raw" | _counts_from_json)"
+    echo "bloqueado=$b trabajando=$w hecho=$d inactivo=$i"
+    ;;
+  watch)
+    command -v socat >/dev/null 2>&1 || _die "falta 'socat' (packages/pacman.txt)"
+    command -v jq    >/dev/null 2>&1 || _die "falta 'jq' (packages/pacman.txt)"
+    # sondeo, no suscripción: la API no documenta un canal de eventos
+    # empujados, así que se pregunta cada N segundos. 2s es suficiente
+    # para que "el agente terminó" se sienta inmediato sin castigar la CPU.
+    while true; do
+      _once
+      sleep "$INTERVAL"
+    done
+    ;;
+  -h|--help)
+    echo "uso: dotctl herdr-bridge <watch|once|status>"
+    echo
+    echo "watch   sondea y publica en la barra (por defecto; lo lanza exec.lua)"
+    echo "once    un solo sondeo y publicación"
+    echo "status  imprime el conteo por consola, para depurar"
+    echo
+    echo "socket: $SOCKET"
+    ;;
+  *)
+    _die "acción desconocida: $1"
+    ;;
+esac

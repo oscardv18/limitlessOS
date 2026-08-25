@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# dot:summary=Bloquea la sesión gráfica de inmediato
+# dot:group=sesion
+# dot:glyph=◘
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# SUPER+K (spec-keybinds.md §3.1). Va por `loginctl lock-session`, no por
+# `hyprlock` directo, para usar EXACTAMENTE el mismo camino que hypridle
+# cuando bloquea por inactividad (stow/hypr/.config/hypr/hypridle.conf:
+# general.lock_cmd). Dos formas distintas de bloquear serían dos formas
+# distintas de que falle.
+#
+# Si logind no responde (sesión sin systemd, o hypridle caído), se cae a
+# hyprlock directo — bloquear siempre es preferible a no bloquear.
+
+set -uo pipefail
+
+if pidof hyprlock >/dev/null 2>&1; then
+  exit 0   # ya bloqueada; no apilar instancias
+fi
+
+if command -v loginctl >/dev/null 2>&1 && loginctl lock-session 2>/dev/null; then
+  exit 0
+fi
+
+if command -v hyprlock >/dev/null 2>&1; then
+  exec hyprlock
+fi
+
+echo "  [ERR] ni loginctl ni hyprlock disponibles — no se pudo bloquear" >&2
+exit 1

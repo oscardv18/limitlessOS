@@ -38,5 +38,31 @@ stage_main() {
   done
 
   ui_ok "dotfiles enlazados"
+
+  # ── vincular dotctl al PATH del sistema ──────────────────────────────
+  # Sin esto, ni dotctl mismo es invocable por nombre suelto fuera de un
+  # script que ya conozca $REPO_DIR — y la mitad de spec-keybinds.md
+  # (todo lo que hl.dsp.exec_cmd("dotctl ...") dispara desde Hyprland,
+  # lua/keybinds.lua) queda sin efecto, porque LightDM → uwsm → Hyprland
+  # no pasa por ningún rc de shell (.zshenv nunca se ejecuta ahí).
+  # /usr/local/bin sí está en el PATH por defecto de systemd para
+  # cualquier proceso del sistema, sesión gráfica incluida — sin
+  # depender de que nadie source nada.
+  #
+  # Solo dotctl necesita esto: todo lo demás en bin/cmd/ se invoca A
+  # TRAVÉS de dotctl, nunca directo, y bin/discord-wayland ya se resuelve
+  # por ruta absoluta desde su propio .desktop.
+  local dotctl_src="$REPO_DIR/bin/dotctl"
+  local dotctl_link="/usr/local/bin/dotctl"
+  if [[ -L "$dotctl_link" && "$(readlink -f "$dotctl_link" 2>/dev/null)" == "$(readlink -f "$dotctl_src" 2>/dev/null)" ]]; then
+    ui_skip "dotctl ya vinculado en $dotctl_link"
+  elif [[ -e "$dotctl_link" ]]; then
+    ui_warn "$dotctl_link ya existe y no es el enlace de este repo — no se sobrescribe a ciegas"
+    ui_info "revísalo a mano; dotctl sigue funcionando invocado con la ruta completa ($dotctl_src)"
+  else
+    ui_spin "Vinculando dotctl a $dotctl_link" -- sudo ln -s "$dotctl_src" "$dotctl_link" || \
+      ui_warn "no se pudo crear el enlace — dotctl sigue funcionando solo con la ruta completa"
+  fi
+
   return 0
 }

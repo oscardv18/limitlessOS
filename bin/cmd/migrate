@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# dot:summary=Ejecuta las migraciones pendientes del repositorio
+# dot:group=sistema
+# dot:glyph=⟳
+# dot:requires-sudo=false
+# dot:terminal=true
+#
+# plan-automation.md §5. Scripts en migrations/<timestamp>-<slug>.sh,
+# ejecutados en orden por nombre; cada uno que termina bien deja su marca
+# en ~/.local/state/limitless/migrations/; los ya marcados no se repiten.
+#
+# La regla de cuándo escribir una (de plan-automation.md §5, y conviene
+# recordarla aquí porque es lo que evita que esto se llene de basura):
+# **solo cuando un cambio rompa un `stow` limpio o deje residuos.**
+# Un cambio de color no es una migración. Renombrar un directorio de tema
+# o retirar un paquete sustituido, sí.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_fail() { echo "  [ERR] $1" >&2; }
+  ui_warn() { echo "  [WARN] $1"; }
+  ui_info() { echo "  [INFO] $1"; }
+  ui_skip() { echo "  --  $1 (ya hecho)"; }
+fi
+
+MIGRATIONS_DIR="$REPO_DIR/migrations"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/limitless/migrations"
+mkdir -p "$STATE_DIR"
+
+_desc_of() {
+  grep -m1 '^#: desc:' "$1" 2>/dev/null | sed 's/^#: desc:[[:space:]]*//'
+}
+
+_pending() {
+  [[ -d "$MIGRATIONS_DIR" ]] || return 0
+  local f base
+  for f in "$MIGRATIONS_DIR"/*.sh; do
+    [[ -e "$f" ]] || continue
+    base="$(basename "$f" .sh)"
+    [[ -f "$STATE_DIR/$base" ]] && continue
+    echo "$f"
+  done
+}
+
+case "${1:-run}" in
+  run)
+    mapfile -t pend < <(_pending)
+    if (( ${#pend[@]} == 0 )); then
+      ui_ok "no hay migraciones pendientes"
+      exit 0
+    fi
+
+    ui_info "${#pend[@]} migración(es) pendiente(s)"
+    failed=0
+    for f in "${pend[@]}"; do
+      base="$(basename "$f" .sh)"
+      desc="$(_desc_of "$f")"
+      ui_info "$base — ${desc:-sin descripción}"
+
+      if bash "$f"; then
+        touch "$STATE_DIR/$base"
+        ui_ok "$base"
+      else
+        ui_fail "$base falló"
+        failed=$((failed + 1))
+        # No se marca como hecha: se reintentará la próxima vez. Y se
+        # PARA, en vez de seguir: las migraciones son ordenadas por
+        # diseño, y ejecutar la siguiente sobre un estado a medias es
+        # cómo se convierte un fallo recuperable en uno que no lo es.
+        ui_warn "se detiene aquí; las siguientes quedan pendientes"
+        break
+      fi
+    done
+
+    (( failed == 0 )) || exit 1
+    ;;
+  list)
+    [[ -d "$MIGRATIONS_DIR" ]] || { ui_info "no hay directorio migrations/"; exit 0; }
+    for f in "$MIGRATIONS_DIR"/*.sh; do
+      [[ -e "$f" ]] || continue
+      base="$(basename "$f" .sh)"
+      if [[ -f "$STATE_DIR/$base" ]]; then
+        printf '  [hecha]     %s — %s\n' "$base" "$(_desc_of "$f")"
+      else
+        printf '  [pendiente] %s — %s\n' "$base" "$(_desc_of "$f")"
+      fi
+    done
+    ;;
+  mark)
+    # marcar como hecha sin ejecutarla — para cuando ya aplicaste el
+    # cambio a mano y no quieres que el script lo repita
+    base="${2:-}"
+    [[ -n "$base" ]] || { ui_fail "uso: dotctl migrate mark <nombre>"; exit 1; }
+    [[ -f "$MIGRATIONS_DIR/$base.sh" ]] || { ui_fail "no existe: $base"; exit 1; }
+    touch "$STATE_DIR/$base"
+    ui_ok "$base marcada como hecha (sin ejecutar)"
+    ;;
+  -h|--help)
+    echo "uso: dotctl migrate <run|list|mark <nombre>>"
+    echo
+    echo "run    ejecuta las pendientes en orden (por defecto)"
+    echo "list   muestra todas con su estado"
+    echo "mark   marca una como hecha sin ejecutarla"
+    ;;
+  *)
+    ui_fail "acción desconocida: $1"
+    exit 1
+    ;;
+esac

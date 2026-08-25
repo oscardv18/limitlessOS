@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# dot:summary=Cicla o fija el layout de ventanas del workspace actual
+# dot:group=shell
+# dot:glyph=▤
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# SUPER+[ y SUPER+] (spec-keybinds.md §3.1). El orden y los nombres salen
+# de stow/hypr/.config/hypr/lua/layouts.lua (Fase 1): master y dwindle son
+# nativos, scrolling es nativo desde 0.50+, grid es el layout custom
+# registrado con hl.layout.register.
+#
+# NOTA sobre `focus`: layouts.lua lo dejó deliberadamente sin implementar
+# (no se pudo confirmar la API para saber qué ventana está enfocada dentro
+# de un layout custom). Por eso NO está en esta lista — añadirlo aquí
+# antes de que exista haría que el ciclo pasara por un layout inexistente.
+
+set -uo pipefail
+
+LAYOUTS=(master dwindle scrolling grid)
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/limitless"
+STATE_FILE="$STATE_DIR/layout"
+mkdir -p "$STATE_DIR"
+
+_current_index() {
+  local cur=0
+  [[ -f "$STATE_FILE" ]] && cur="$(cat "$STATE_FILE" 2>/dev/null || echo 0)"
+  [[ "$cur" =~ ^[0-9]+$ ]] || cur=0
+  (( cur >= ${#LAYOUTS[@]} )) && cur=0
+  echo "$cur"
+}
+
+_apply() {
+  local idx="$1" name="${LAYOUTS[$1]}"
+  command -v hyprctl >/dev/null 2>&1 || {
+    echo "  [ERR] hyprctl no disponible" >&2
+    exit 1
+  }
+  hyprctl keyword general:layout "$name" >/dev/null 2>&1 || {
+    echo "  [ERR] no se pudo aplicar el layout '$name'" >&2
+    exit 1
+  }
+  echo "$idx" >"$STATE_FILE"
+
+  # aviso en el OSD del shell; si el shell no corre, no pasa nada
+  command -v qs >/dev/null 2>&1 && \
+    qs -c limitless ipc call osd showText "layout" "$name" >/dev/null 2>&1 || true
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -a "Limitless" "▤ LAYOUT" "$name" -t 1200 2>/dev/null || true
+}
+
+action="${1:-cycle}"
+
+case "$action" in
+  cycle)
+    step="${2:-1}"
+    [[ "$step" =~ ^-?[0-9]+$ ]] || step=1
+    cur="$(_current_index)"
+    n=${#LAYOUTS[@]}
+    next=$(( ( (cur + step) % n + n ) % n ))   # módulo positivo, admite -1
+    _apply "$next"
+    ;;
+  set)
+    want="${2:-}"
+    for i in "${!LAYOUTS[@]}"; do
+      if [[ "${LAYOUTS[$i]}" == "$want" ]]; then
+        _apply "$i"
+        exit 0
+      fi
+    done
+    echo "  [ERR] layout desconocido: $want" >&2
+    echo "disponibles: ${LAYOUTS[*]}" >&2
+    exit 1
+    ;;
+  current)
+    echo "${LAYOUTS[$(_current_index)]}"
+    ;;
+  list)
+    printf '%s\n' "${LAYOUTS[@]}"
+    ;;
+  -h|--help)
+    echo "uso: dotctl layout <cycle [±n] | set <nombre> | current | list>"
+    echo
+    echo "layouts: ${LAYOUTS[*]}"
+    ;;
+  *)
+    echo "  [ERR] acción desconocida: $action" >&2
+    exit 1
+    ;;
+esac

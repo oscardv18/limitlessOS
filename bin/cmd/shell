@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# dot:summary=Muestra u oculta una superficie del shell (launcher, menú, control...)
+# dot:group=shell
+# dot:glyph=◈
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# Puente entre los atajos de Hyprland y QuickShell. lua/keybinds.lua (Fase 1)
+# invoca `dotctl shell <superficie> <acción>` — nunca `qs ipc` directo — según
+# la regla de plan-automation.md §3: los keybinds llaman siempre a dotctl.
+#
+# El receptor del otro lado es modules/IPC.qml (toggle/show/hide) instanciado
+# por cada superficie con su propio surfaceName.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_fail() { echo "  [ERR] $1" >&2; }
+  ui_info() { echo "  [INFO] $1"; }
+fi
+
+QS_CONFIG="limitless"
+
+# Nombre del atajo (spec-keybinds.md) → surfaceName real en QML.
+# Coinciden casi siempre; la excepción está documentada abajo.
+_surface_target() {
+  case "$1" in
+    launcher)  echo "launcher" ;;
+    menu)      echo "menu" ;;
+    pkg)       echo "pkg" ;;
+    widgets)   echo "widgets" ;;
+    control)   echo "control" ;;
+    # SUPER+P se llama "dev" en spec-keybinds.md (sesión de desarrollo),
+    # pero la superficie QML se llama "projects" (ProjectsPanel.qml). Se
+    # traduce aquí en vez de renombrar ninguno de los dos: el atajo lleva
+    # el nombre del flujo, el QML el del panel, y ambos son correctos en
+    # su propio contexto.
+    dev)       echo "projects" ;;
+    clipboard) echo "clipboard" ;;
+    dock)      echo "dock" ;;
+    saver)     echo "saver" ;;
+    *)         echo "" ;;
+  esac
+}
+
+_usage() {
+  echo "uso: dotctl shell <superficie> <acción>"
+  echo
+  echo "Superficies: launcher, menu, pkg, widgets, control, dev, clipboard, dock, saver"
+  echo "Acciones:    toggle (por defecto), show, hide"
+  echo "             dock además acepta: pin-toggle, hide-toggle"
+}
+
+surface="${1:-}"
+action="${2:-toggle}"
+
+if [[ -z "$surface" || "$surface" == "-h" || "$surface" == "--help" ]]; then
+  _usage
+  exit 0
+fi
+
+target="$(_surface_target "$surface")"
+if [[ -z "$target" ]]; then
+  ui_fail "superficie desconocida: $surface"
+  _usage
+  exit 1
+fi
+
+if ! command -v qs >/dev/null 2>&1; then
+  ui_fail "quickshell (qs) no está instalado — no hay shell al que hablarle"
+  exit 1
+fi
+
+# dock: pin-toggle / hide-toggle son acciones propias suyas, no el
+# toggle genérico de mostrar/ocultar.
+if [[ "$surface" == "dock" ]]; then
+  case "$action" in
+    pin-toggle)  action="pinToggle" ;;
+    hide-toggle) action="toggle" ;;
+  esac
+fi
+
+if ! qs -c "$QS_CONFIG" ipc call "$target" "$action" 2>/dev/null; then
+  ui_fail "no se pudo invocar '$target $action'"
+  ui_info "¿está corriendo el shell? pruébalo con: qs -c $QS_CONFIG ipc show"
+  exit 1
+fi

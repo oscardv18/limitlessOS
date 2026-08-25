@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# dot:summary=Abre o alterna un scratchpad (terminal, música, notas, sistema, git)
+# dot:group=shell
+# dot:glyph=◫
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# Scratchpads = "special workspaces" de Hyprland: un workspace nombrado que
+# se superpone al actual. spawn-o-toggle con estado, por eso vive en un
+# script y no en un dispatcher suelto del keybind (spec-layouts.md §3.1,
+# reconciliado en spec-keybinds.md §3.4).
+#
+# Lógica: si el special workspace ya tiene una ventana, se alterna su
+# visibilidad; si está vacío, se lanza el programa dentro. Así el primer
+# atajo abre y el segundo esconde, sin duplicar procesos.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_fail() { echo "  [ERR] $1" >&2; }
+fi
+
+TERM_CMD="${LIMITLESS_TERMINAL:-ghostty}"
+
+# nombre → comando que lo llena la primera vez
+_scratch_cmd() {
+  case "$1" in
+    term)    echo "$TERM_CMD" ;;
+    music)   echo "$TERM_CMD -e rmpc" ;;
+    notes)   echo "$TERM_CMD -e nvim +'set filetype=markdown' $HOME/notas.md" ;;
+    sys)     echo "$TERM_CMD -e btop" ;;
+    lazygit) echo "$TERM_CMD -e lazygit" ;;
+    *)       echo "" ;;
+  esac
+}
+
+name="${1:-}"
+
+if [[ -z "$name" || "$name" == "-h" || "$name" == "--help" ]]; then
+  echo "uso: dotctl scratch <term|music|notes|sys|lazygit>"
+  echo
+  echo "Abre el scratchpad si está vacío, lo alterna si ya tiene ventana."
+  echo "El terminal se puede cambiar con LIMITLESS_TERMINAL (por defecto: ghostty)."
+  exit 0
+fi
+
+cmd="$(_scratch_cmd "$name")"
+if [[ -z "$cmd" ]]; then
+  ui_fail "scratchpad desconocido: $name"
+  echo "disponibles: term, music, notes, sys, lazygit" >&2
+  exit 1
+fi
+
+if ! command -v hyprctl >/dev/null 2>&1; then
+  ui_fail "hyprctl no disponible — ¿estás dentro de una sesión de Hyprland?"
+  exit 1
+fi
+
+# ¿hay alguna ventana ya en este special workspace?
+# hyprctl clients -j da JSON; se filtra por el nombre del workspace.
+# Sin jq se cae a grep — jq está en packages/pacman.txt, pero el rescate
+# desde un TTY pelado no debería depender de él.
+ws="special:$name"
+has_window=0
+if command -v jq >/dev/null 2>&1; then
+  count="$(hyprctl clients -j 2>/dev/null | jq --arg w "$ws" '[.[] | select(.workspace.name == $w)] | length' 2>/dev/null || echo 0)"
+  [[ "${count:-0}" -gt 0 ]] && has_window=1
+else
+  hyprctl clients 2>/dev/null | grep -q "workspace: .*($ws)" && has_window=1
+fi
+
+if (( has_window == 1 )); then
+  hyprctl dispatch togglespecialworkspace "$name"
+else
+  # exec dentro del special workspace: la regla [workspace ...] hace que
+  # la ventana nazca ya dentro, sin parpadeo en el workspace actual.
+  hyprctl dispatch exec "[workspace $ws silent] $cmd"
+  hyprctl dispatch togglespecialworkspace "$name"
+fi

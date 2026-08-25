@@ -8,7 +8,12 @@
 # un script directamente (plan-automation.md §3, último párrafo).
 
 set -uo pipefail
-CMD_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/cmd" &>/dev/null && pwd)"
+# readlink -f resuelve el symlink de /usr/local/bin/dotctl (40-stow.sh)
+# antes de calcular el directorio — sin esto, BASH_SOURCE[0] es la ruta
+# del symlink, no la del script real, y CMD_DIR termina apuntando a
+# /usr/local/bin/cmd (que no existe) en vez de a este repo. Mismo patrón
+# que ya usan bin/cmd/pkg-install y el resto.
+CMD_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/cmd" &>/dev/null && pwd)"
 
 _usage() {
   echo "uso: dotctl <comando> [args...]"

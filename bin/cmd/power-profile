@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# dot:summary=Ajusta efectos visuales según batería o corriente
+# dot:group=sistema
+# dot:glyph=⏻
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# LIMITLESS-OS.md §6, Fase 6: "degradación por batería". El cristal real
+# (blur multipaso + vibrancy) es lo más caro que dibuja este escritorio, y
+# en un portátil desenchufado es exactamente lo primero que sobra.
+#
+# Dos perfiles:
+#   corriente → el aspecto completo (los valores de lua/appearance.lua)
+#   batería   → blur más barato, sin sombras, animaciones más cortas
+#
+# Se aplica con `hyprctl keyword`, en caliente, sin recargar la config: un
+# `hyprctl reload` volvería a leer appearance.lua y desharía el ajuste.
+#
+# NOTA HONESTA: los números del perfil de batería son una primera
+# aproximación razonada (menos pasos de blur = menos muestreos de textura),
+# NO medidos. Calibrarlos de verdad exige un portátil real con esta config
+# corriendo y `powertop`/`nvtop` delante. Está anotado como pendiente de
+# hardware en docs/LIMITLESS-OS.md §6.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_info() { echo "  [INFO] $1"; }
+fi
+
+_on_ac() {
+  # /sys/class/power_supply es la interfaz estándar del kernel. Un equipo
+  # de sobremesa no tiene batería: ahí no hay nada que degradar, así que
+  # "sin batería" cuenta como corriente.
+  local ps
+  for ps in /sys/class/power_supply/A{C,DP}*/online; do
+    [[ -r "$ps" ]] || continue
+    [[ "$(cat "$ps" 2>/dev/null)" == "1" ]] && return 0
+    return 1
+  done
+  return 0
+}
+
+_apply_plugged() {
+  command -v hyprctl >/dev/null 2>&1 || return 0
+  hyprctl --batch "\
+    keyword decoration:blur:enabled true;\
+    keyword decoration:blur:size 6;\
+    keyword decoration:blur:passes 3;\
+    keyword decoration:blur:vibrancy 0.42;\
+    keyword decoration:shadow:enabled true;\
+    keyword animations:enabled true" >/dev/null 2>&1 || true
+  ui_ok "perfil: corriente (aspecto completo)"
+}
+
+_apply_battery() {
+  command -v hyprctl >/dev/null 2>&1 || return 0
+  # blur de un solo paso: sigue habiendo cristal, cuesta bastante menos.
+  # No se apaga del todo a propósito — el cristal ES la identidad del
+  # sistema, degradarlo es aceptable, quitarlo no (CLAUDE.md).
+  hyprctl --batch "\
+    keyword decoration:blur:enabled true;\
+    keyword decoration:blur:size 4;\
+    keyword decoration:blur:passes 1;\
+    keyword decoration:blur:vibrancy 0.2;\
+    keyword decoration:shadow:enabled false;\
+    keyword animations:enabled true" >/dev/null 2>&1 || true
+  ui_ok "perfil: batería (cristal reducido)"
+}
+
+_auto() {
+  if _on_ac; then _apply_plugged; else _apply_battery; fi
+}
+
+case "${1:-auto}" in
+  auto)    _auto ;;
+  plugged) _apply_plugged ;;
+  battery) _apply_battery ;;
+  status)
+    if _on_ac; then echo "corriente"; else echo "batería"; fi
+    ;;
+  watch)
+    # sondeo simple: udev daría eventos, pero exige una regla en /etc y
+    # este proyecto evita tocar /etc fuera del instalador. 20s es de sobra
+    # para algo que solo cambia cuando enchufas el cable.
+    ui_info "vigilando el estado de alimentación cada 20s"
+    last=""
+    while true; do
+      now="$(_on_ac && echo ac || echo bat)"
+      if [[ "$now" != "$last" ]]; then
+        _auto
+        last="$now"
+      fi
+      sleep 20
+    done
+    ;;
+  -h|--help)
+    echo "uso: dotctl power-profile <auto|plugged|battery|status|watch>"
+    echo
+    echo "auto     detecta y aplica (por defecto)"
+    echo "watch    vigila y reacciona al enchufar/desenchufar"
+    ;;
+  *)
+    echo "  [ERR] acción desconocida: $1" >&2
+    exit 1
+    ;;
+esac

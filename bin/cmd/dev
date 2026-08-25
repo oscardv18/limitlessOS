@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# dot:summary=Abre una sesión de trabajo completa para un proyecto
+# dot:group=desarrollo
+# dot:glyph=⑂
+# dot:requires-sudo=false
+# dot:terminal=false
+#
+# LIMITLESS-OS.md §4.3. `dotctl dev open <proyecto>` coloca de una vez:
+#   1. workspace `code`, layout master
+#   2. editor en el master, en el directorio del proyecto
+#   3. sesión de herdr restaurada (si herdr está y el proyecto la tiene)
+#   4. lazygit en el stack si el repo está sucio
+#
+# El punto 4 es condicional a propósito: abrir lazygit en un repo limpio
+# es ruido. Se abre cuando hay algo que mirar.
+#
+# La UI de esta orden es modules/ProjectsPanel.qml (SUPER+P) — este script
+# es el motor de despacho que esa UI todavía no invocaba.
+
+set -uo pipefail
+
+REPO_DIR="$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/../.." &>/dev/null && pwd)"
+if [[ -f "$REPO_DIR/install/lib/ui.sh" ]]; then
+  source "$REPO_DIR/install/lib/ui.sh"
+else
+  ui_ok()   { echo "  [OK]  $1"; }
+  ui_fail() { echo "  [ERR] $1" >&2; }
+  ui_info() { echo "  [INFO] $1"; }
+fi
+
+PROJECTS_DIR="${LIMITLESS_PROJECTS_DIR:-$HOME/dev}"
+TERM_CMD="${LIMITLESS_TERMINAL:-ghostty}"
+EDITOR_CMD="${LIMITLESS_EDITOR:-nvim}"
+
+_list_projects() {
+  [[ -d "$PROJECTS_DIR" ]] || return 0
+  find "$PROJECTS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort
+}
+
+_open() {
+  local name="$1"
+  local dir="$PROJECTS_DIR/$name"
+
+  [[ -d "$dir" ]] || { ui_fail "no existe el proyecto: $dir"; exit 1; }
+  command -v hyprctl >/dev/null 2>&1 || { ui_fail "hyprctl no disponible"; exit 1; }
+
+  # 1. workspace semántico `code` = 1 (lua/workspaces.lua, Fase 1) + master
+  hyprctl dispatch workspace 1 >/dev/null 2>&1 || true
+  "$REPO_DIR/bin/cmd/layout" set master >/dev/null 2>&1 || true
+
+  # 2. editor, en el directorio del proyecto
+  hyprctl dispatch exec "[workspace 1] $TERM_CMD --working-directory=$dir -e $EDITOR_CMD" >/dev/null 2>&1 || true
+
+  # 3. sesión de herdr, si la hay. `herdr attach` sobre un nombre de
+  #    sesión inexistente falla sin efectos secundarios, así que se
+  #    intenta y se ignora el fallo en vez de sondear antes.
+  if command -v herdr >/dev/null 2>&1; then
+    hyprctl dispatch exec "[workspace 1 silent] $TERM_CMD --working-directory=$dir -e herdr attach $name" >/dev/null 2>&1 || true
+  fi
+
+  # 4. lazygit SOLO si el repo está sucio
+  if git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+    if [[ -n "$(git -C "$dir" status --porcelain 2>/dev/null)" ]]; then
+      hyprctl dispatch exec "[workspace 1] $TERM_CMD --working-directory=$dir -e lazygit" >/dev/null 2>&1 || true
+      ui_info "repo con cambios sin commitear — lazygit abierto"
+    fi
+  fi
+
+  # publicar el proyecto activo para la barra y el cromo del HUD, que lo
+  # leen con FileView. Formato: "<nombre>\t<rama>" en una sola línea.
+  # Sin esto la barra no tendría de dónde sacar la rama y volvería a
+  # enseñar un valor fijo — que es justo lo que se quitó.
+  local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/limitless"
+  mkdir -p "$state_dir"
+  local branch=""
+  if git -C "$dir" rev-parse --git-dir >/dev/null 2>&1; then
+    branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+  fi
+  printf '%s\t%s\n' "$name" "$branch" >"$state_dir/project"
+
+  command -v notify-send >/dev/null 2>&1 && \
+    notify-send -a "Limitless" "⑂ SESIÓN" "$name — editor y git colocados" -t 1800 2>/dev/null || true
+
+  ui_ok "sesión abierta: $name"
+}
+
+action="${1:-}"
+
+case "$action" in
+  open)
+    name="${2:-}"
+    if [[ -z "$name" ]]; then
+      # sin argumento: elegir con fzf, coherente con el panel de paquetes
+      if command -v fzf >/dev/null 2>&1; then
+        name="$(_list_projects | fzf --prompt='⑂ PROYECTO › ' --pointer='❯' --height=40% --layout=reverse)" || exit 0
+      fi
+      [[ -n "$name" ]] || { ui_fail "no se indicó proyecto"; exit 1; }
+    fi
+    _open "$name"
+    ;;
+  list)
+    _list_projects
+    ;;
+  scan)
+    # Estado de git de cada proyecto, en TSV, una línea por proyecto:
+    #   nombre \t rama \t sucios \t adelante \t detrás \t último-commit
+    # Lo consume modules/ProjectsPanel.qml (Fase 4). Vive aquí y no en el
+    # QML porque la lógica de git es de sistema, no de interfaz — y así
+    # se puede depurar desde la terminal sin abrir el shell.
+    [[ -d "$PROJECTS_DIR" ]] || exit 0
+    for d in "$PROJECTS_DIR"/*/; do
+      [[ -d "$d" ]] || continue
+      name="$(basename "$d")"
+      branch=""; dirty=0; ahead=0; behind=0; last=""
+      if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+        branch="$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+        dirty="$(git -C "$d" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+        # @{u} falla si la rama no tiene remoto configurado — es normal,
+        # no un error: se queda en 0 y no se avisa de nada.
+        ahead="$(git -C "$d" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)"
+        behind="$(git -C "$d" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+        last="$(git -C "$d" log -1 --format=%cr 2>/dev/null || echo "")"
+      fi
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$branch" "$dirty" "$ahead" "$behind" "$last"
+    done
+    ;;
+  -h|--help|"")
+    echo "uso: dotctl dev <open [proyecto] | list | scan>"
+    echo
+    echo "open   abre la sesión completa (workspace, editor, herdr, lazygit)"
+    echo "       sin argumento, elige con fzf"
+    echo "list   lista los proyectos detectados"
+    echo "scan   estado de git de cada proyecto en TSV (lo usa el panel del HUD)"
+    echo
+    echo "Directorio de proyectos: $PROJECTS_DIR"
+    echo "  (se cambia con LIMITLESS_PROJECTS_DIR)"
+    ;;
+  *)
+    ui_fail "acción desconocida: $action"
+    exit 1
+    ;;
+esac
